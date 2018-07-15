@@ -1,0 +1,191 @@
+---
+- hosts: localhost
+  tasks:
+  - name: Ensure new_app_capacity variable is set
+    fail:
+      msg: "You must specify the desired app node autoscaling group capacity via the ansible -e flag (e.g. -e new_app_capacity=5)."
+    when: new_app_capacity is undefined
+
+  - name: Get autoscaling group information
+    command: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg"
+    changed_when: false
+    register: asg_current
+
+  - name: Increase autoscaling group max size if necessary
+    command: "aws autoscaling update-auto-scaling-group --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg --max-size {{ new_app_capacity }}"
+    when: (asg_current.stdout | from_json).AutoScalingGroups[0].MaxSize | int < new_app_capacity | int
+
+  - name: Set new desired autoscaling group capacity
+    command: "aws autoscaling set-desired-capacity --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg --desired-capacity {{ new_app_capacity }}"
+    when: (asg_current.stdout | from_json).AutoScalingGroups[0].DesiredCapacity | int != new_app_capacity | int
+
+  # List of EC2 instances currently in autoscaling group: ((asg_next.stdout | from_json).AutoScalingGroups[0].Instances)
+  # List of EC2 lifecycle states for autoscaling instances: ((asg_next.stdout | from_json).AutoScalingGroups[0].Instances | map(attribute='LifecycleState') | list)
+  - name: Ensure all instances are properly added to autoscaling group
+    command: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg"
+    changed_when: false
+    register: asg_next
+    until: "('Pending' not in (asg_next.stdout | from_json).AutoScalingGroups[0].Instances | map(attribute='LifecycleState') | list) and ((asg_next.stdout | from_json).AutoScalingGroups[0].Instances | length | int == new_app_capacity | int)"
+    retries: 100
+    delay: 10
+
+  - name: Ensure all instances are passing health checks (This can take some time)
+    vars:
+      instance_ids: "{{ (asg_next.stdout | from_json).AutoScalingGroups[0].Instances | map(attribute='InstanceId') | list }}"
+    command: "aws ec2 describe-instance-status --max-items 100 --instance-ids {{ instance_ids | join(' ') }}"
+    changed_when: false
+    register: instance_statuses
+    until: "'initializing' not in ((instance_statuses.stdout | from_json).InstanceStatuses | map(attribute='SystemStatus.Status') | list) and 'initializing' not in ((instance_statuses.stdout | from_json).InstanceStatuses | map(attribute='InstanceStatus.Status') | list)"
+    retries: 100
+    delay: 10
+
+  - name: Refresh dynamic inventory
+    meta: refresh_inventory
+
+  - name: Generate new_nodes host group
+    vars:
+      new_app_group: "{{ 'tag_Type_' + cluster_id | regex_replace('-', '_') + '_' + asg_name | regex_replace('-', '_') + '_app_node' }}"
+      new_app_ips: "{{ groups[new_app_group] }}"
+      new_node_hostnames: "{{ new_app_ips | map('extract', hostvars) | map(attribute='ec2_private_dns_name') | list | difference(groups['app_'+asg_name]) }}"
+    add_host:
+      name: "{{ item | regex_replace('ec2.internal', host_suffix) }}"
+      groups: new_nodes
+      openshift_node_labels:
+        logging: 'true'
+        env: app
+        region: primary
+        zone: default
+    changed_when: false
+    with_items: "{{ new_node_hostnames }}"
+
+  - name: Regenerate ssh configurations
+    vars:
+      app_group: "{{ 'tag_Name_' + cluster_id | regex_replace('-', '_') + '_app_node_asg' }}"
+      app_ips: "{{ groups[app_group] }}"
+      home_dir: "{{ user_local_home }}"
+      local_path: "{{ user_local_path }}"
+    import_role:
+      name: ssh_config
+
+  - name: Add bastion nodes to appropriate groups
+    add_host:
+      name: "{{ hostvars[item].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+      groups: bastion
+    changed_when: false
+    with_items: "{{ bastion_ips }}"
+
+- name: Bootstrap new nodes
+  hosts: new_nodes
+  become: true
+  gather_facts: true
+  tasks:
+  - name: Apply base configuration
+    vars:
+      install_packages: "{{ cluster_packages }}"
+      started_enabled_services:
+      - rngd
+      - docker
+      certificates_path: "{{ user_local_path }}/certificates/"
+    import_role:
+      name: base_bootstrap
+
+  - name: Apply cluster configuration
+    vars:
+      bastion_private_ip: "{{ hostvars[bastion_ips[0]].ec2_private_ip_address }}"
+    import_role:
+      name: cluster_bootstrap
+
+- name: Scale OpenShift cluster
+  hosts: bastion
+  gather_facts: true
+  vars:
+    hosts_file: "{{ user_remote_path }}/inventory/{{ cluster_id }}-{{ asg_name }}-hosts"
+    installer_playbook: /usr/share/ansible/openshift-ansible/playbooks/byo/openshift-node/scaleup.yml
+    bastion_proxy: false
+  tasks:
+  - name: Create ansible config
+    copy:
+      src: ../../ansible.cfg
+      dest: "{{ user_remote_home }}/ansible.cfg"
+
+  - name: Create callback directory
+    file:
+      state: directory
+      path: "{{ user_remote_home }}/callback"
+
+  - name: Create callpack plugins
+    copy:
+      src: ../../callback/memory.py
+      dest: "{{ user_remote_home }}/callback/memory.py"
+      mode: 0744
+
+  - name: Ensure inventory directories exists
+    file:
+      path: "{{ user_remote_path }}/{{ item }}"
+      state: directory
+    with_items:
+    - inventory
+    - logs
+
+  - name: Create OpenShift Ansible inventory file on Bastion
+    vars:
+      new_nodes: "{{ groups.get('new_nodes', []) }}"
+    template:
+      src: ../../templates/scaling-hosts.j2
+      dest: "{{ hosts_file }}"
+      backup: yes
+
+  - name: Ensure .ssh directory exists
+    file:
+      state: directory
+      path: "{{ user_remote_home }}/.ssh"
+
+  - name: Create ssh keys
+    copy:
+      src: "{{ user_local_home }}/.ssh/{{ item }}"
+      dest: "{{ user_remote_home }}/.ssh/{{ item }}"
+      mode: 0600
+    with_items:
+    - "{{ master_key_pair }}.pem"
+    - "{{ node_key_pair }}.pem"
+
+  - name: Generate ssh config
+    vars:
+      local_path: "{{ user_remote_path }}"
+      home_dir: "{{ user_remote_home }}"
+    import_role:
+      name: ssh_config
+
+  - name: Scale OpenShift (this will take some time)
+    shell: "/usr/bin/ansible-playbook -i {{ hosts_file }} {{ installer_playbook }} >> {{ user_remote_path}}/logs/{{ cluster_id }}-{{ asg_name }}-ocp-scale-$(date +%Y%m%d-%H%M%S).log 2>&1"
+    args:
+      chdir: "{{ user_remote_home }}"
+
+#  - name: Cleanup files
+#    file:
+#      state: absent
+#      path: "{{ item }}"
+#    with_items:
+#    - "{{ user_remote_home }}/ansible.cfg"
+#    - "{{ user_remote_home }}/.ssh/{{ master_key_pair }}.pem"
+#    - "{{ user_remote_home }}/.ssh/{{ node_key_pair }}.pem"
+#    - "{{ user_remote_home }}/.ssh/config"
+#    - "{{ user_remote_home }}/.ssh/known_hosts"
+#    - "{{ user_remote_path }}"
+
+- hosts: localhost
+  tasks:
+  - name: Ensure inventory directory exists
+    file:
+      path: "{{ user_local_path }}/inventory"
+      state: directory
+
+  - name: Regenerate OpenShift Ansible inventory file locally
+    vars:
+      new_nodes: []
+    template:
+      src: "../../templates/hosts.j2"
+      dest: "{{ user_local_path }}/inventory/{{ cluster_id }}-hosts"
+      backup: yes
+    when: groups.get('new_nodes', []) | length > 0
+

@@ -1,0 +1,14 @@
+# Name of volume group for cluster logical volumes
+volume_group_name: ''
+
+# List of logical volumes to configure on master nodes
+master_logical_volumes: []
+
+# List of logical volumes to configure on infra nodes
+infra_logical_volumes: []
+
+# List of logical volumes to configure on app nodes
+app_logical_volumes: []
+
+# Private IP address of bastion host
+bastion_private_ip: ''

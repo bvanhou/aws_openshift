@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploys ELB OpenShift cluster into an existing VPC
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Deployment Environment
+        Parameters:
+          - Environment
+          - AZ
+          - VpcID
+          - PublicSubnetID
+      - Label:
+          default: LoadBalancer Security Groups  
+        Parameters:                  
+          - InfraNodeELBSG
+          - MasterExtELBSG
+          - MasterIntELBSG
+    ParameterLabels:
+      InfraNodeELBSG:
+        default: InfraNode Load Balancer Security Groups
+      MasterExtELBSG:
+        default: External Master Load Balancer Security Groups
+      MasterIntELBSG:
+        default: Internal Master Load Balancer Security Groups
+Outputs: 
+    InfraNodeELB:
+        Description: Infra node ELB
+        Export:
+          Name:
+            'Fn::Join':
+                - ''
+                - - Ref: Environment
+                  - '-infra-node-elb'
+                  - Ref: AZ
+        Value: 
+          'Fn::Join':
+            - ''
+            - - Fn::GetAtt: InfraNodeELB.SourceSecurityGroup.GroupName
+    MasterExtELB:
+        Description: External Master node ELB
+        Export:
+          Name:
+            'Fn::Join':
+              - ''
+              - - Ref: Environment
+                - '-master-ext-elb-'
+                - Ref: AZ
+        Value: 
+          'Fn::Join':
+            - ''
+            - - Fn::GetAtt: MasterExtELB.SourceSecurityGroup.GroupName
+    MasterIntELB:
+        Description: Internal Master node ELB
+        Export:
+          Name:
+            'Fn::Join':
+              - ''
+              - - Ref: Environment
+                - '-master-int-elb-'
+                - Ref: AZ
+        Value: 
+          'Fn::Join':
+            - ''
+            - - Fn::GetAtt: MasterIntELB.SourceSecurityGroup.GroupName
+Parameters:
+  AZ:
+    AllowedValues:
+      - us-east-1a
+      - us-east-1b
+      - us-east-1c
+      - us-east-1d
+      - us-east-1e
+      - us-east-1f
+      - us-west-1a
+      - us-west-1b
+      - us-west-1c
+      - us-west-2a
+      - us-west-2b
+      - us-west-2c
+    Description: Availability Zone
+    Type: String
+    Default: us-east-1a
+  Environment:
+    Default: staging
+    Description: Environment Name to deploy security groups into
+    Type: String
+    AllowedValues:
+      - prod
+      - staging
+      - sandbox
+      - test
+      - uat
+      - dev
+  VpcID:
+    Default: vpc-0000000
+    Description: ID of the VPC to deploy security groups into
+    Type: 'AWS::EC2::VPC::Id'
+  PublicSubnetID:
+    Default: subnet-000000
+    Description: Subnet ID to deploy elastic loadbalancer into
+    Type: 'AWS::EC2::Subnet::Id'
+  InfraNodeELBSG:
+    Default: sg-000000
+    Description: Security Groups for the Infranode LoadBalancer
+    Type: 'AWS::EC2::SecurityGroup::Id'
+  MasterExtELBSG:
+    Default: sg-000000
+    Description: Security Groups for the Master External LoadBalancer
+    Type: 'AWS::EC2::SecurityGroup::Id'
+  MasterIntELBSG:
+    Default: sg-000000
+    Description: Security Groups for the Master Internal LoadBalancer
+    Type: 'AWS::EC2::SecurityGroup::Id'
+  Scheme:
+    Description: Elastic Load Balancer Scheme
+    Type: 'String'
+    Default: internet-facing
+Resources:
+  InfraNodeELB:
+    Properties:
+      ConnectionDrainingPolicy:
+        Enabled: true
+        Timeout: 60
+      ConnectionSettings:
+        IdleTimeout: 60
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: 2
+        Interval: 90
+        Target: 'HTTP:1936/healthz'
+        Timeout: 60
+        UnhealthyThreshold: 10
+      Listeners:
+        - InstancePort: 80
+          InstanceProtocol: TCP
+          LoadBalancerPort: 80
+          Protocol: TCP
+        - InstancePort: 443
+          InstanceProtocol: TCP
+          LoadBalancerPort: 443
+          Protocol: TCP
+      Scheme: 
+        Ref: Scheme
+      SecurityGroups:
+        - Ref: InfraNodeELBSG
+      Subnets:
+        - 'Fn::Join':
+          - ''
+          - - Ref: PublicSubnetID
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+              - ''
+              - - Ref: Environment
+                - '-infra-node-elb-'
+                - Ref: AZ
+        - Key: Environment
+          Value: 
+            Fn::Join:
+              - ''
+              - - Ref: Environment
+      LoadBalancerName:
+          Fn::Join:
+            - ''
+            - - Ref: Environment
+              - '-infra-node-elb-'
+              - Ref: AZ
+    Type: 'AWS::ElasticLoadBalancing::LoadBalancer'
+  MasterExtELB:
+    Properties:
+      ConnectionDrainingPolicy:
+        Enabled: true
+        Timeout: 60
+      ConnectionSettings:
+        IdleTimeout: 60
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: 2
+        Interval: 90
+        Target: 'HTTPS:443/healthz/ready'
+        Timeout: 60
+        UnhealthyThreshold: 10
+      Listeners:
+        - InstancePort: 443
+          InstanceProtocol: TCP
+          LoadBalancerPort: 443
+          Protocol: TCP
+      Scheme:
+        Ref: Scheme
+      SecurityGroups:
+        - Ref: MasterExtELBSG
+      Subnets:
+        - 'Fn::Join':
+          - ''
+          - - Ref: PublicSubnetID
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+            - ''
+            - - Ref: Environment
+              - '-master-ext-elb-'
+              - Ref: AZ
+        - Key: Environment
+          Value: 
+            Fn::Join:
+              - ''
+              - - Ref: Environment
+      LoadBalancerName:
+          Fn::Join:
+            - ''
+            - - Ref: Environment
+              - '-master-ext-elb-'
+              - Ref: AZ
+    Type: 'AWS::ElasticLoadBalancing::LoadBalancer'
+  MasterIntELB:
+    Properties:
+      ConnectionDrainingPolicy:
+        Enabled: true
+        Timeout: 60
+      ConnectionSettings:
+        IdleTimeout: 60
+      CrossZone: true
+      HealthCheck:
+        HealthyThreshold: 2
+        Interval: 90
+        Target: 'HTTPS:443/healthz/ready'
+        Timeout: 60
+        UnhealthyThreshold: 10
+      Listeners:
+        - InstancePort: 443
+          InstanceProtocol: TCP
+          LoadBalancerPort: 443
+          Protocol: TCP
+      Scheme: internal
+      SecurityGroups:
+        - Ref: MasterIntELBSG
+      Subnets:
+        - 'Fn::Join':
+          - ''
+          - - Ref: PublicSubnetID
+      Tags:
+        - Key: Name
+          Value:
+            Fn::Join:
+            - ''
+            - - Ref: Environment
+              - '-master-int-elb-'
+              - Ref: AZ
+        - Key: Environment
+          Value: 
+            Fn::Join:
+              - ''
+              - - Ref: Environment
+      LoadBalancerName:
+          Fn::Join:
+            - ''
+            - - Ref: Environment
+              - '-master-int-elb-'
+              - Ref: AZ   
+    Type: 'AWS::ElasticLoadBalancing::LoadBalancer'

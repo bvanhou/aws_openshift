@@ -1,0 +1,13 @@
+{% if publicly_accessible %}
+Host {{ ssh_shortname }} {{ public_ip }} {{ dns_name }}
+    Hostname {{ public_ip }}
+{% else %}
+Host {{ ssh_shortname }} {{ dns_name }} {{ private_ip }}
+    Hostname {{ private_ip }}
+{% endif %}
+    IdentityFile {{ home_dir }}/.ssh/{{ ssh_key_name }}.pem
+    PasswordAuthentication no
+    PreferredAuthentications publickey
+    ProxyCommand none
+    StrictHostKeyChecking no
+    User ec2-user

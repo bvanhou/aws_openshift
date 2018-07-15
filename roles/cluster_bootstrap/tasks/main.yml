@@ -1,0 +1,186 @@
+---
+- name: Check for OCP volume group (Failure is expected)
+  shell: "vgs --noheadings | grep -q {{ volume_group_name }}"
+  changed_when: no
+  ignore_errors: yes
+  register: is_volume_group
+
+- name: Configure volume group if necessary
+  block:
+  - name: Copy data block script
+    copy:
+      src: files/get_disk.sh
+      dest: "{{ user_remote_home }}/get_disk.sh"
+      mode: 0744
+
+  # We are assuming there is a single extra block device that will host all cluster logical volumes
+  - name: Determine empty block device
+    command: "{{ user_remote_home }}/get_disk.sh"
+    changed_when: false
+    register: data_volume
+
+  - name: Fail if no additonal blocks exist
+    fail:
+      msg: Additional storage block device missing
+    when: data_volume.stdout == ''
+
+  - name: Create logical volume group for cluster data
+    lvg:
+      pvs: "{{ data_volume.stdout }}"
+      vg: "{{ volume_group_name }}"
+  when: is_volume_group.rc != 0
+
+- name: Configure storage on master hosts
+  block:
+  - name: Create logical volumes
+    lvol:
+      vg: "{{ volume_group_name }}"
+      size: "{{ item.size_pct }}%FREE"
+      lv: "{{ item.name }}"
+      shrink: no
+    with_items: "{{ master_logical_volumes }}"
+
+  - name: Format filesystems
+    filesystem:
+      dev: "/dev/mapper/{{ volume_group_name }}-{{ item.name }}"
+      fstype: ext4
+    with_items: "{{ master_logical_volumes }}"
+
+  - name: Mount volumes
+    mount:
+      state: mounted
+      path: "{{ item.mount_point }}"
+      src: "/dev/mapper/{{ volume_group_name }}-{{ item.name }}"
+      fstype: ext4
+    with_items: "{{ master_logical_volumes }}"
+  when: "'master' in group_names"
+
+- name: Configure storage on infra hosts
+  block:
+  - name: Create logical volumes
+    lvol:
+      vg: "{{ volume_group_name }}"
+      size: "{{ item.size_pct }}%FREE"
+      lv: "{{ item.name }}"
+      shrink: no
+    with_items: "{{ infra_logical_volumes }}"
+
+  - name: Format filesystems
+    filesystem:
+      dev: "/dev/mapper/{{ volume_group_name }}-{{ item.name }}"
+      fstype: ext4
+    with_items: "{{ infra_logical_volumes }}"
+
+  - name: Mount volumes
+    mount:
+      state: mounted
+      path: "{{ item.mount_point }}"
+      src: "/dev/mapper/{{ volume_group_name }}-{{ item.name }}"
+      fstype: ext4
+    with_items: "{{ infra_logical_volumes }}"
+  when: "'infra' in group_names"
+
+- name: Configure storage on app hosts
+  block:
+  - name: Create logical volumes
+    lvol:
+      vg: "{{ volume_group_name }}"
+      size: "{{ item.size_pct }}%FREE"
+      lv: "{{ item.name }}"
+      shrink: no
+    with_items: "{{ app_logical_volumes }}"
+
+  - name: Format filesystems
+    filesystem:
+      dev: "/dev/mapper/{{ volume_group_name }}-{{ item.name }}"
+      fstype: ext4
+    with_items: "{{ app_logical_volumes }}"
+
+  - name: Mount volumes
+    mount:
+      state: mounted
+      path: "{{ item.mount_point }}"
+      src: "/dev/mapper/{{ volume_group_name }}-{{ item.name }}"
+      fstype: ext4
+    with_items: "{{ app_logical_volumes }}"
+  when: "'app' in group_names or 'new_nodes' in group_names"
+
+- name: Create /etc/sysconfig/docker-storage-setup
+  template:
+    src: templates/docker-storage-setup.j2
+    dest: /etc/sysconfig/docker-storage-setup
+
+# https://docs.docker.com/storage/storagedriver/overlayfs-driver/#configure-docker-with-the-overlay-or-overlay2-storage-driver
+- name: Configure docker to use overlay 2 storage driver
+  blockinfile:
+    path: /etc/docker/daemon.json
+    block: |
+      {
+        "storage-driver": "overlay2",
+        "storage-opts": [
+          "overlay2.override_kernel_check=true"
+        ]
+      }
+  notify:
+  - Restart docker
+
+# The assumption is that if docker info contains overlay, docker storage is configured properly
+- name: Check whether container-storage-setup needs to be run
+  shell: docker info | grep -q overlay
+  register: container_storage
+  ignore_errors: true
+  changed_when: false
+
+- name: Run container-storage-setup
+  command: /usr/bin/container-storage-setup
+  when: container_storage.rc != 0
+  notify:
+  - Restart docker
+
+# This is configured to avoid NLB hair-pinning on master nodes by using host IP for all API requests
+# This section contains logic to try an experimental workaround using /etc/hosts via the hosts_workaround flag
+- block:
+  - name: Install dnsmasq on masters
+    yum:
+      name: dnsmasq
+      state: present
+    when: not hosts_workaround
+
+  - name: Create dnsmasq configuration on masters
+    template:
+      src: templates/master-dnsmasq.conf.j2
+      dest: /etc/dnsmasq.d/master-dnsmasq.conf
+    when: not hosts_workaround
+
+  - name: Start/enable dnsmasq on masters
+    systemd:
+      name: dnsmasq
+      enabled: yes
+      state: started
+    when: not hosts_workaround
+
+  - name: Configure masters to use self as dns
+    shell: nmcli con mod 'System eth0' ipv4.ignore-auto-dns yes ipv4.dns "127.0.0.1"
+    when: not hosts_workaround
+    notify:
+    - Restart NetworkManager
+
+  - name: Configure masters to use bastion as dns
+    shell: "nmcli con mod 'System eth0' ipv4.ignore-auto-dns yes ipv4.dns {{ bastion_private_ip }}"
+    when: hosts_workaround
+    notify:
+    - Restart NetworkManager
+
+  - name: Configure masters to use self as OpenShift API endpoint via /etc/hosts
+    lineinfile:
+      path: /etc/hosts
+      regexp: '^127.0.0.1.*$'
+      line: "127.0.0.1   localhost localhost.localdomain localhost4 localhost4.localdomain4 {{ openshift_master_cluster_hostname }} {{ openshift_master_cluster_public_hostname }}"
+    when: hosts_workaround
+  when: "'master' in group_names"
+
+- name: Configure non-masters to use bastion as dns
+  shell: "nmcli con mod 'System eth0' ipv4.ignore-auto-dns yes ipv4.dns {{ bastion_private_ip }}"
+  when: "'master' not in group_names"
+  notify:
+  - Restart NetworkManager

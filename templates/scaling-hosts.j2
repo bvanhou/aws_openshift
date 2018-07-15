@@ -1,0 +1,78 @@
+# https://github.com/openshift/openshift-ansible/blob/release-3.7-hotfix/inventory/byo/hosts.example
+# https://docs.openshift.com/container-platform/3.7/install_config/install/advanced_install.html
+
+[OSEv3:vars]
+ansible_ssh_user=ec2-user
+ansible_become=yes
+
+openshift_disable_check=package_availability,memory_availability,docker_image_availability
+
+openshift_deployment_type=openshift-enterprise
+openshift_release=v3.7
+containerized=false
+openshift_master_cluster_method=native
+openshift_install_examples=false
+osm_use_cockpit=false
+openshift_set_hostname=true
+openshift_enable_service_catalog=false
+openshift_master_overwrite_named_certificates=true
+openshift_metrics_install_metrics=false
+openshift_logging_install_logging=false
+
+os_sdn_network_plugin_name='redhat/openshift-ovs-multitenant'
+
+openshift_master_api_port={{ api_port }}
+openshift_master_console_port={{ api_port }}
+openshift_master_cluster_hostname={{ openshift_master_cluster_hostname }}
+openshift_master_cluster_public_hostname={{ openshift_master_cluster_public_hostname }}
+openshift_master_default_subdomain={{ openshift_master_default_subdomain }}
+
+openshift_master_identity_providers=[{'name': 'htpasswd_auth', 'login': 'true', 'challenge': 'true', 'kind': 'HTPasswdPasswordIdentityProvider', 'filename': '/etc/origin/master/htpasswd'}]
+
+openshift_docker_options="--log-driver=json-file --log-opt max-size=50m"
+openshift_node_kubelet_args={'max-pods': ['100'], 'image-gc-high-threshold': ['80'], 'image-gc-low-threshold': ['50'], 'system-reserved': ['cpu=200m,memory=1024Mi']}
+docker_version="1.12.6"
+
+openshift_docker_additional_registries='{{ openshift_docker_additional_registries }}'
+openshift_docker_blocked_registries='{{ openshift_docker_blocked_registries }}'
+oreg_url={{ oreg_url }}
+openshift_examples_modify_imagestreams={{ openshift_examples_modify_imagestreams }}
+
+openshift_hosted_router_selector='region=infra'
+openshift_hosted_router_replicas=2
+openshift_hosted_manage_registry=false
+#openshift_hosted_registry_selector='region=infra'
+openshift_hosted_registry_replicas=0
+
+{% if enable_cloudprovider %}
+openshift_cloudprovider_kind=aws
+openshift_cloudprovider_aws_access_key="{{ iam_account_id }}"
+openshift_cloudprovider_aws_secret_key="{{ iam_account_key }}"
+openshift_clusterid={{ cluster_id }}
+{% endif %}
+
+[OSEv3:children]
+masters
+etcd
+nodes
+new_nodes
+
+[masters]
+{% for ip in master_ips %}
+{{ hostvars[ip].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }} host_zone={{ region }}
+{% endfor %}
+
+[etcd]
+{% for ip in master_ips %}
+{{ hostvars[ip].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }} host_zone={{ region }}
+{% endfor %}
+
+[nodes]
+{% for ip in master_ips %}
+{{ hostvars[ip].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }} openshift_node_labels="{'logging': 'true', 'openshift_schedulable': 'False', 'region': 'infra', 'zone': 'default'}"
+{% endfor %}
+
+[new_nodes]
+{% for node in new_nodes %}
+{{ node | regex_replace('ec2.internal', host_suffix) }} openshift_node_labels="{'logging': 'true', 'env':'app', 'region': 'primary', 'zone': 'default'}"
+{% endfor %}

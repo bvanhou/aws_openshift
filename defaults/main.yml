@@ -1,0 +1,88 @@
+---
+# Cluster ID used to uniquely determine cluster in AWS region
+cluster_id: "{{ cluster_environment }}{{ '%02d' | format(cluster_number | int) }}"
+
+# AWS environment parameters
+region: "{{ availability_zone[:-1] }}"
+
+# Hostname conventions
+dns_short_name: "{{ dns_region }}ose{{ region[3:] | regex_replace('-', '') }}{{ '%02d' | format(cluster_number | int) }}{{ dns_environment }}"
+
+# OpenShift DNS names
+openshift_master_default_subdomain: "{{ dns_short_name }}.{{ host_suffix }}"
+openshift_master_cluster_hostname: "{{ dns_short_name }}-internal.{{ host_suffix }}"
+openshift_master_cluster_public_hostname: "{{ dns_short_name }}-webapi.{{ host_suffix }}"
+
+# Enable cloudprovider configuration
+enable_cloudprovider: false
+
+# Generate a new EC2 keypair
+key_pair_generation: true
+
+# Key pair names
+bastion_key_pair: "bastion-{{ cluster_id }}"
+master_key_pair: "master-{{ cluster_id }}"
+node_key_pair: "node-{{ cluster_id }}"
+
+# Should cluster hosts get a public IP address
+publicly_accessible: false
+
+# User-scoped path for files used during cluster administration
+user_local_path: "{{ lookup('env', 'HOME') }}/etc/ansible"
+user_local_home: "{{ lookup('env', 'HOME') }}"
+user_remote_path: /home/ec2-user/etc/ansible
+user_remote_home: /home/ec2-user
+
+# LVM
+volume_group_name: ocp
+
+# RPMs to install on bastion
+bastion_packages:
+- dnsmasq
+- rng-tools
+- atomic-openshift-utils
+
+# RPMs to install on cluster hosts
+cluster_packages:
+- dnsmasq
+- docker-1.12.6
+- atomic-openshift-utils
+- wget
+- git
+- unzip
+- net-tools
+- bind-utils
+- iptables-services
+- bridge-utils
+- bash-completion
+- kexec-tools
+- sos
+- psacct
+- lvm2
+- rng-tools
+
+# RPMs to remove on all hosts
+remove_packages:
+- qemu-guest-agent
+- rhn-check
+- rhnlib
+- rhn-client-tools
+- rhnsd
+- rhn-setup
+- yum-rhn-plugin
+- rh-amazon-rhui-client
+- Red_Hat_Enterprise_Linux_Release_Notes-7-en-US
+
+# Experimental workaround for NLB hair-pinning. Speeds up installation, but it is unclear if there are undesirable downstream effects
+hosts_workaround: false
+
+# Dynamic inventory shorthands - Underscores needed due to special characters getting converted to underscores
+# http://docs.ansible.com/ansible/latest/user_guide/intro_dynamic_inventory.html#example-aws-ec2-external-inventory-script
+bastion_group: "{{ 'tag_Name_' + cluster_id | regex_replace('-', '_') + '_bastion_node_asg' }}"
+master_group: "{{ 'tag_Name_' + cluster_id | regex_replace('-', '_') + '_master_node_asg' }}"
+infra_group: "{{ 'tag_Name_' + cluster_id | regex_replace('-', '_') + '_infra_node_asg' }}"
+app_group: "{{ 'tag_Name_' + cluster_id | regex_replace('-', '_') + '_app_node_asg' }}"
+bastion_ips: "{{ groups[bastion_group] }}"
+master_ips: "{{ groups[master_group] }}"
+infra_ips: "{{ groups.get(infra_group, []) }}"
+app_ips: "{{ groups.get(app_group, []) }}"

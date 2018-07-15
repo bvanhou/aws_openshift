@@ -1,0 +1,55 @@
+# Bastion EC2 instance size - https://aws.amazon.com/ec2/instance-types/
+bastion_instance_type: m5.large
+
+# Master EC2 autoscaling group parameters
+master_capacity: 3
+master_instance_type: m5.2xlarge
+master_os_volume_size: 100
+master_extra_volume_size: 200
+master_logical_volumes:
+  # container-storage-setup uses the space leftover on the non-root
+  # block device after the following  logical volumes are configured
+- name: varliborigin
+  size_pct: 5
+  mount_point: /var/lib/origin
+- name: varlibetcd
+  size_pct: 45
+  mount_point: /var/lib/etcd
+
+# Infra EC2 autoscaling group parameters
+infra_capacity: 3
+infra_instance_type: m5.2xlarge
+infra_os_volume_size: 100
+infra_extra_volume_size: 200
+infra_logical_volumes:
+  # container-storage-setup uses the space leftover on the non-root
+  # block device after the following  logical volumes are configured
+- name: varliborigin
+  size_pct: 50
+  mount_point: /var/lib/origin
+
+# App auto scaling group configurations
+# Avoid special characters in the name field
+app_asgs:
+- name: base
+  capacity: 2
+  instance_type: m5.2xlarge
+  os_volume_size: 50
+  extra_volume_size: 50
+  logical_volumes:
+    # container-storage-setup uses the space leftover on the non-root
+    # block device after the following logical volumes are configured
+  - name: varliborigin
+    size_pct: 50
+    mount_point: /var/lib/origin
+- name: spare
+  capacity: 0
+  instance_type: m5.2xlarge
+  os_volume_size: 50
+  extra_volume_size: 50
+  logical_volumes:
+    # container-storage-setup uses the space leftover on the non-root
+    # block device after the following logical volumes are configured
+  - name: varliborigin
+    size_pct: 50
+    mount_point: /var/lib/origin

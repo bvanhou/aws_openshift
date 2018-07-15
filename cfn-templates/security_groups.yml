@@ -1,0 +1,434 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift security groups
+
+Parameters:
+
+  ClusterID:
+    Type: String
+    Description: Unique value identifying this OpenShift environment
+
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: ID of the VPC to deploy EC2 instance into
+
+  AZ:
+    Type: String
+    Description: Availability Zone
+    Default: us-east-1a
+
+  MasterAPIPort:
+    Type: String
+    Description: Port for API traffic
+
+Metadata:
+
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: Environment
+      Parameters:
+      - ClusterID
+      - VpcID
+      - AZ
+    - Label:
+        default: Port Information
+      Parameters:
+      - MasterAPIPort
+    ParameterLabels:
+      ClusterID:
+        default: ClusterID Name
+      VpcID:
+        default: VPC ID
+      AZ:
+        default: Availability Zone
+      MasterAPIPort:
+        default: Master API Port
+
+Resources:
+# https://docs.openshift.com/container-platform/3.7/install_config/configuring_aws.html#configuring-a-security-group-aws
+
+  BastionNodeSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: !Join [ '', [ !Ref ClusterID, '-bastion-node-sg' ] ]
+      VpcId: !Ref VpcID
+      GroupDescription: Bastion Node Security Group
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-bastion-node-sg' ] ]
+      - Key: ClusterID
+        Value: !Ref ClusterID
+
+  BastionNodeIngressSSHTCP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt BastionNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+
+  BastionNodeIngressDNSUDP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt BastionNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: udp
+      FromPort: '53'
+      ToPort: '53'
+
+  AppNodeSG:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: !Join [ '', [ !Ref ClusterID, '-app-node-sg' ] ]
+      GroupDescription: Application Node Security Group
+      VpcId: !Ref VpcID
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-app-node-sg' ] ]
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+      - Key: ClusterID
+        Value: !Ref ClusterID
+
+  AppNodeEgressTCP:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !GetAtt AppNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: '0'
+      ToPort: '65535'
+
+  AppNodeEgressUDP:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !GetAtt AppNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: udp
+      FromPort: '0'
+      ToPort: '65535'
+
+  AppNodeIngressBastionSSH:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt AppNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt BastionNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+
+  AppNodeIngressMasterKubelet:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt AppNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '10250'
+      ToPort: '10250'
+
+  AppNodeIngressMasterSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt AppNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  AppNodeIngressInfraSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt AppNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt InfraNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  AppNodeIngressAppSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt AppNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt AppNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  InfraNodeSG:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: !Join [ '', [ !Ref ClusterID, '-infra-node-sg' ] ]
+      GroupDescription: Infra Node Security Group
+      VpcId: !Ref VpcID
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-infra-node-sg' ] ]
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+      - Key: ClusterID
+        Value: !Ref ClusterID
+
+  InfraNodeEgressTCP:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: '0'
+      ToPort: '65535'
+
+  InfraNodeEgressUDP:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: udp
+      FromPort: '0'
+      ToPort: '65535'
+
+  InfraNodeIngressBastionSSH:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt BastionNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+
+  InfraNodeIngressMasterKubelet:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '10250'
+      ToPort: '10250'
+
+  InfraNodeIngressMasterSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  InfraNodeIngressInfraSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt InfraNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  InfraNodeIngressAppSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt AppNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  InfraNodeIngressHTTPS:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      
+  InfraNodeIngressHTTP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt InfraNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+
+  MasterNodeSG:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: !Join [ '', [ !Ref ClusterID, '-master-node-sg' ] ]
+      GroupDescription: Master Node Security Group
+      VpcId: !Ref VpcID
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-master-node-sg' ] ]
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+      - Key: ClusterID
+        Value: !Ref ClusterID
+
+  MasterNodeEgressTCP:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: '0'
+      ToPort: '65535'
+
+  MasterNodeEgressUDP:
+    Type: 'AWS::EC2::SecurityGroupEgress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: udp
+      FromPort: '0'
+      ToPort: '65535'
+
+  MasterNodeIngressBastionSSH:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt BastionNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '22'
+      ToPort: '22'
+
+  MasterNodeIngressMasterKubelet:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '10250'
+      ToPort: '10250'
+
+  MasterNodeIngressMasterSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  MasterNodeIngressInfraSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt InfraNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  MasterNodeIngressAppSDN:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt AppNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '4789'
+      ToPort: '4789'
+
+  MasterNodeIngressMasterDNSTCP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '8053'
+      ToPort: '8053'
+
+  MasterNodeIngressMasterDNSUDP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '8053'
+      ToPort: '8053'
+
+  MasterNodeIngressInfraDNSTCP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt InfraNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '8053'
+      ToPort: '8053'
+
+  MasterNodeIngressInfraDNSUDP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt InfraNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '8053'
+      ToPort: '8053'
+
+  MasterNodeIngressAppDNSTCP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt AppNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '8053'
+      ToPort: '8053'
+
+  MasterNodeIngressAppDNSUDP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt AppNodeSG.GroupId
+      IpProtocol: udp
+      FromPort: '8053'
+      ToPort: '8053'
+
+  MasterNodeIngressETCD:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '2379'
+      ToPort: '2379'
+
+  MasterNodeIngressETCDPeering:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      SourceSecurityGroupId: !GetAtt MasterNodeSG.GroupId
+      IpProtocol: tcp
+      FromPort: '2380'
+      ToPort: '2380'
+
+  MasterNodeIngressHTTPS:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt MasterNodeSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: !Ref MasterAPIPort
+      ToPort: !Ref MasterAPIPort
+
+Outputs:
+
+  BastionNodeSG:
+    Description: Bastion node security group
+    Value: !Ref BastionNodeSG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-bastion-node-sg' ] ]
+
+  MasterNodeSG:
+    Description: Master node security group
+    Value: !Ref MasterNodeSG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-master-node-sg' ] ]
+
+  InfraNodeSG:
+    Description: Infrastructure node security group
+    Value: !Ref InfraNodeSG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-infra-node-sg' ] ]
+
+  AppNodeSG:
+    Description: Application node security group
+    Value: !Ref AppNodeSG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-app-node-sg' ] ]

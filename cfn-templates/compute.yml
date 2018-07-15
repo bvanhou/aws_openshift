@@ -1,0 +1,127 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift cluster compute
+
+Parameters:
+
+  ClusterID:
+    Type: String
+    Description: Unique value identifying this OpenShift environment
+
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: ID of the VPC to deploy EC2 instance into
+
+  SubnetID:
+    Type: String
+    Description: ID of the subnet to deploy EC2 instance into
+
+  AZ:
+    Type: String
+    Description: Availability Zone
+    Default: us-east-1a
+
+  AMIId:
+    Type: String
+    Default: ami-7a96b801
+    Description: ID of AMI to use for cluster nodes
+
+  AutoScalingGroupName:
+    Type: String
+    Description: Name of app node autoscaling group
+
+  AppNodeDesiredCapacity:
+    Type: String
+    Description: Application node desired capacity
+
+  AppNodeInstanceType:
+    Type: String
+    Description: Application node instance type
+
+  AppNodeMaxFleetSize:
+    Type: String
+    Description: Max application node fleet size
+
+  AppNodeMinFleetSize:
+    Type: String
+    Description: Min application node fleet size
+
+  AppNodeKeyPairName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: App Node key pair name
+
+  AppNodeOSVolumeSize:
+    Type: String
+    Description: EBS Volume size for OS Image
+
+  AppNodeExtraVolumeSize:
+    Type: String
+    Description: EBS Volume size for extra mount points
+
+  PubliclyAccessible:
+    Type: String
+    Description: Should nodes get public ips
+    Default: false
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+Resources:
+
+  AppNodeASG:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      DesiredCapacity: !Ref AppNodeDesiredCapacity
+      LaunchConfigurationName: !Ref AppNodeLaunchConfig
+      MaxSize: !Ref AppNodeMaxFleetSize
+      MinSize: !Ref AppNodeMinFleetSize
+      AutoScalingGroupName: !Join [ '', [ !Ref ClusterID, '-', !Ref AutoScalingGroupName, '-app-node-asg' ] ]
+      LifecycleHookSpecificationList:
+      - DefaultResult: CONTINUE
+        HeartbeatTimeout: 30
+        LifecycleHookName: !Join [ '', [ !Ref ClusterID, '-', !Ref AutoScalingGroupName, '-app-node-asg-lh' ] ]
+        LifecycleTransition: autoscaling:EC2_INSTANCE_TERMINATING
+      VPCZoneIdentifier: [ !Ref SubnetID ]
+      TerminationPolicies: [ NewestInstance ]
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-app-node-asg' ] ]
+        PropagateAtLaunch: true
+      - Key: Type
+        Value: !Join [ '', [ !Ref ClusterID, '-', !Ref AutoScalingGroupName, '-app-node' ] ]
+        PropagateAtLaunch: true
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+        PropagateAtLaunch: true
+      - Key: ClusterID
+        Value: !Ref ClusterID
+        PropagateAtLaunch: true
+
+  AppNodeLaunchConfig:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      AssociatePublicIpAddress: !Ref PubliclyAccessible
+      BlockDeviceMappings:
+      - DeviceName: /dev/sda1
+        Ebs:
+          DeleteOnTermination: true
+          VolumeSize: !Ref AppNodeOSVolumeSize
+          VolumeType: gp2
+      - DeviceName: /dev/xvdb
+        Ebs:
+          DeleteOnTermination: true
+          Encrypted: true
+          VolumeSize: !Ref AppNodeExtraVolumeSize
+          VolumeType: gp2
+      ImageId: !Ref AMIId
+      InstanceType: !Ref AppNodeInstanceType
+      KeyName: !Ref AppNodeKeyPairName
+      SecurityGroups:
+      - Fn::ImportValue: !Join [ '', [ !Ref ClusterID, '-app-node-sg' ] ]
+
+Outputs:
+
+  AppNodeASG:
+    Description: Application node auto-scaling group
+    Value: !Ref AppNodeASG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-', !Ref AutoScalingGroupName, '-app-node-asg' ] ]

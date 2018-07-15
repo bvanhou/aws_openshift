@@ -1,0 +1,88 @@
+---
+- name: Create user local ssh configuration directory
+  file:
+    path: "{{ local_path }}/ssh_config"
+    state: directory
+
+- name: Get list of existing ssh configurations
+  find:
+    paths: "{{ local_path }}/ssh_config"
+    patterns: "{{ cluster_id }}-*.cfg"
+    recurse: false
+  register: existing_ssh
+
+- name: Delete old cluster configurations
+  file:
+    state: absent
+    path: "{{ local_path }}/ssh_config/{{ cluster_id}}-{{ item }}.cfg"
+  with_items: existing_ssh.files | map(attribute='path') | map('regex_search', '\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}') | list | difference(bastion_ips + master_ips + infra_ips + app_ips)
+
+- name: Create user local bastion ssh configurations
+  vars:
+    ssh_shortname: "{{ cluster_id }}-bastion"
+    public_ip:  "{{ hostvars[item]['ec2_ip_address'] }}"
+    dns_name: "{{ hostvars[item]['ec2_private_dns_name'] | regex_replace('ec2.internal', host_suffix) }}"
+    private_ip: "{{ item }}"
+    ssh_key_name: "{{ hostvars[item]['ec2_key_name'] }}"
+  template:
+    src: templates/bastion.cfg.j2
+    dest: "{{ local_path }}/ssh_config/{{ cluster_id }}-{{ item }}.cfg"
+  with_items: "{{ bastion_ips }}"
+  when: bastion_proxy
+
+- name: Create user local master ssh configurations
+  vars:
+    ssh_shortname: "{{ cluster_id }}-master"
+    bastion_public_ip:  "{{ hostvars[bastion_ips[0]]['ec2_ip_address'] }}"
+    bastion_private_ip: "{{ bastion_ips[0] }}"
+    dns_name: "{{ hostvars[item]['ec2_private_dns_name'] | regex_replace('ec2.internal', host_suffix) }}"
+    private_ip: "{{ item }}"
+    ssh_key_name: "{{ hostvars[item]['ec2_key_name'] }}"
+  template:
+    src: templates/node.cfg.j2
+    dest: "{{ local_path }}/ssh_config/{{ cluster_id }}-{{ item }}.cfg"
+  with_items: "{{ master_ips }}"
+
+- name: Create user local infra ssh configurations
+  vars:
+    ssh_shortname: "{{ cluster_id }}-infra"
+    bastion_public_ip:  "{{ hostvars[bastion_ips[0]]['ec2_ip_address'] }}"
+    bastion_private_ip: "{{ bastion_ips[0] }}"
+    dns_name: "{{ hostvars[item]['ec2_private_dns_name'] | regex_replace('ec2.internal', host_suffix) }}"
+    private_ip: "{{ item }}"
+    ssh_key_name: "{{ hostvars[item]['ec2_key_name'] }}"
+  template:
+    src: templates/node.cfg.j2
+    dest: "{{ local_path }}/ssh_config/{{ cluster_id }}-{{ item }}.cfg"
+  with_items: "{{ infra_ips }}"
+
+- name: Create user local app ssh configurations
+  vars:
+    ssh_shortname: "{{ cluster_id }}-app"
+    bastion_public_ip:  "{{ hostvars[bastion_ips[0]]['ec2_ip_address'] }}"
+    bastion_private_ip: "{{ bastion_ips[0] }}"
+    dns_name: "{{ hostvars[item]['ec2_private_dns_name'] | regex_replace('ec2.internal', host_suffix) }}"
+    private_ip: "{{ item }}"
+    ssh_key_name: "{{ hostvars[item]['ec2_key_name'] }}"
+  template:
+    src: templates/node.cfg.j2
+    dest: "{{ local_path }}/ssh_config/{{ cluster_id }}-{{ item }}.cfg"
+  with_items: "{{ app_ips }}"
+
+- name: Assemble aggregated user local ssh.cfg from individual configurations
+  assemble:
+    src: "{{ local_path }}/ssh_config"
+    dest: "{{ local_path }}/{{ cluster_id }}-ssh.cfg"
+
+- name: Fetch contents of ssh configurations
+  slurp:
+    src: "{{ local_path }}/{{ cluster_id }}-ssh.cfg"
+  register: ssh_configurations
+
+- name: Update local ssh config
+  blockinfile:
+    insertbefore: BOF
+    create: yes
+    mode: 0644
+    path: "{{ home_dir }}/.ssh/config"
+    block: "{{ ssh_configurations['content'] | b64decode }}"

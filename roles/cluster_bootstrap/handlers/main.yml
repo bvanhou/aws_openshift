@@ -1,0 +1,11 @@
+---
+- name: Restart NetworkManager
+  systemd:
+    name: NetworkManager
+    state: restarted
+
+- name: Restart docker
+  systemd:
+    name: docker
+    state: restarted
+

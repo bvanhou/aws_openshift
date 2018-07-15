@@ -1,0 +1,11 @@
+# CIDR range for subnet managed by bastion DNS
+subnet_cidr: ''
+
+# DNS suffix for hosts
+host_suffix: ''
+
+# IP Address for Master API NLB
+master_api_nlb_ip: ''
+
+# IP Address for Infra HAProxy NLB
+infra_haproxy_nlb_ip: ''

@@ -1,0 +1,157 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: AWS CloudFormation Template IAM Groups and Policies
+Parameters:
+  Password:
+    Default: R3dhat!
+    NoEcho: 'true'
+    Type: String
+    Description: Password for ecsAdmin
+    MinLength: '6'
+    MaxLength: '41'
+    AllowedPattern: '[a-zA-Z0-9!]*'
+    ConstraintDescription: must contain only alphanumeric characters.
+Resources:
+  ecsAdmin:
+    Type: 'AWS::IAM::User'
+    Properties:
+      LoginProfile:
+        Password:
+          'Fn::Join':
+            - ''
+            - - Ref: Password
+      UserName: ecsAdmin
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ee864afa-79a2-4fbe-b9dc-b92129afe3f4
+  PolicyECSAccess:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: ECSAccess
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'autoscaling:*'
+              - 'apigateway:*'
+              - 'execute-api:*'
+              - 'tag:*'
+              - 'cloudformation:*'
+              - 'cloudwatch:Describe*'
+              - 'cloudwatch:Get*'
+              - 'cloudwatch:List*'
+              - 'cloudwatch:Create*'
+              - 'ec2:*'
+              - 'elasticloadbalancing:*'
+              - 's3:*'
+              - 'support:*'
+            Resource: '*'
+      Users:
+        - Ref: redhatUser
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 834e7909-0b1e-4e84-817e-2d6d9172b535
+Metadata:
+  'AWS::CloudFormation::Designer':
+    918cb8d9-a4dd-4ce3-9bfe-a48dc6bc5b7e:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: -40
+        'y': 320
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - ee864afa-79a2-4fbe-b9dc-b92129afe3f4
+    6e63d08f-da40-4e65-89fb-96df640b0562:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: -40
+        'y': 240
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - 43cb4cf9-e661-4cb9-8976-da05d351831a
+        - ee864afa-79a2-4fbe-b9dc-b92129afe3f4
+    fe9379b8-5db4-4c29-b522-dfbfc97e2e31:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 170
+        'y': 400
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - ceb7e751-aaec-4abd-b0b6-cc69998b2b18
+        - ee864afa-79a2-4fbe-b9dc-b92129afe3f4
+    8f9705da-b472-4327-a063-dd299384b046:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 170
+        'y': 320
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - ceb7e751-aaec-4abd-b0b6-cc69998b2b18
+        - ee864afa-79a2-4fbe-b9dc-b92129afe3f4
+    2b0db88d-cb2b-4c49-8610-f1bc0d71bc87:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: -40
+        'y': 400
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - ceb7e751-aaec-4abd-b0b6-cc69998b2b18
+        - ee864afa-79a2-4fbe-b9dc-b92129afe3f4
+    834e7909-0b1e-4e84-817e-2d6d9172b535:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 60
+        'y': 200
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - ceb7e751-aaec-4abd-b0b6-cc69998b2b18
+        - ee864afa-79a2-4fbe-b9dc-b92129afe3f4
+    ee864afa-79a2-4fbe-b9dc-b92129afe3f4:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 60
+        'y': 90
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - c81a5727-0f3b-4350-9d03-7da4e24f9696
+        - 834e7909-0b1e-4e84-817e-2d6d9172b535
+        - 6e63d08f-da40-4e65-89fb-96df640b0562
+        - 2b0db88d-cb2b-4c49-8610-f1bc0d71bc87
+        - 8f9705da-b472-4327-a063-dd299384b046
+        - fe9379b8-5db4-4c29-b522-dfbfc97e2e31
+        - 7288154a-397a-494f-9561-9d2d915351f6
+        - d8060c69-36c4-41f9-9908-e6ecc5896e3f
+        - 7bb02f9a-4cf8-4bfc-802e-09d4f31efc8e
+        - e616a0d7-ed7d-43f4-8eeb-9e09c4aa55b5
+        - 918cb8d9-a4dd-4ce3-9bfe-a48dc6bc5b7e
+    e616a0d7-ed7d-43f4-8eeb-9e09c4aa55b5:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 170
+        'y': 240
+      z: 1
+      embeds: []
+      isassociatedwith:
+        - ee864afa-79a2-4fbe-b9dc-b92129afe3f4

@@ -1,0 +1,13 @@
+---
+- name: Push password to Master Nodes
+  hosts: masters
+  become: True
+  tasks:
+  - copy:
+      remote_src: no
+      src: "{{ user_local_path }}/htpasswd"
+      dest: /etc/origin/master/htpasswd
+      owner: root
+      group: root
+      mode: 0600
+      force: yes

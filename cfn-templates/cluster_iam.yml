@@ -1,0 +1,46 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift cluster IAM user and policy
+
+Resources:
+
+  OcpClusterIAMUser:
+    Type: 'AWS::IAM::User'
+    Properties:
+      UserName: OcpClusterIAMUser
+
+  # https://docs.openshift.com/container-platform/3.7/install_config/configuring_aws.html#configuring-aws-permissions
+  OcpClusterIAMPolicy:
+    Type: 'AWS::IAM::Policy'
+    Properties:
+      PolicyName: OcpClusterIAMPolicy
+      PolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action:
+          - "ec2:DescribeVolumes"
+          - "ec2:CreateVolume"
+          - "ec2:CreateTags"
+          - "ec2:DescribeInstances"
+          - "ec2:AttachVolume"
+          - "ec2:DetachVolume"
+          - "ec2:DeleteVolume"
+          - "ec2:DescribeSubnets"
+          - "ec2:CreateSecurityGroup"
+          - "ec2:DescribeSecurityGroups"
+          - "ec2:DescribeRouteTables"
+          - "ec2:AuthorizeSecurityGroupIngress"
+          - "ec2:RevokeSecurityGroupIngress"
+          - "ec2:DescribeInstance*"
+          - "elasticloadbalancing:DescribeTags"
+          - "elasticloadbalancing:CreateLoadBalancerListeners"
+          - "elasticloadbalancing:ConfigureHealthCheck"
+          - "elasticloadbalancing:DeleteLoadBalancerListeners"
+          - "elasticloadbalancing:RegisterInstancesWithLoadBalancer"
+          - "elasticloadbalancing:DescribeLoadBalancers"
+          - "elasticloadbalancing:CreateLoadBalancer"
+          - "elasticloadbalancing:DeleteLoadBalancer"
+          - "elasticloadbalancing:ModifyLoadBalancerAttributes"
+          - "elasticloadbalancing:DescribeLoadBalancerAttributes"
+          Resource: '*'
+      Users:
+      - !Ref OcpClusterIAMUser

@@ -1,0 +1,204 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift control plane
+
+Parameters:
+
+  ClusterID:
+    Type: String
+    Description: Unique value identifying this OpenShift environment
+
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: ID of the VPC to deploy EC2 instance into
+
+  SubnetID:
+    Type: String
+    Description: ID of the subnet to deploy EC2 instance into
+
+  AZ:
+    Type: String
+    Description: Availability Zone
+    Default: us-east-1a
+
+  AMIId:
+    Default: ami-7a96b801
+    Description: ID of AMI to use for cluster nodes
+    Type: String
+
+  MasterNodeDesiredCapacity:
+    Type: String
+    Description: Master node desired capacity
+    AllowedValues: [ 3 ]
+    Default: 3
+
+  MasterNodeInstanceType:
+    Type: String
+    Description: Master node instance type
+
+  MasterNodeMaxFleetSize:
+    Type: String
+    Description: Max master node fleet size
+    AllowedValues: [ 3 ]
+    Default: 3
+
+  MasterNodeMinFleetSize:
+    Type: String
+    Description: Min master node fleet size
+    AllowedValues: [ 3 ]
+    Default: 3
+
+  MasterNodeOSVolumeSize:
+    Type: String
+    Description: EBS Volume size for OS Image
+
+  MasterNodeExtraVolumeSize:
+    Type: String
+    Description: EBS Volume size for extra mount points
+
+  MasterNodeKeyPairName:
+    Description: Master Node key pair name
+    Type: 'AWS::EC2::KeyPair::KeyName'
+
+  InfraNodeDesiredCapacity:
+    Type: String
+    Description: Infrastructure node desired capacity
+
+  InfraNodeInstanceType:
+    Type: String
+    Description: Infrastructure node instance type
+
+  InfraNodeMaxFleetSize:
+    Type: String
+    Description: Max infrastructure node fleet size
+
+  InfraNodeMinFleetSize:
+    Type: String
+    Description: Min infrastructure node fleet size
+
+  InfraNodeKeyPairName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: Infra Node key pair name
+
+  InfraNodeOSVolumeSize:
+    Type: String
+    Description: EBS Volume size for OS Image
+
+  InfraNodeExtraVolumeSize:
+    Type: String
+    Description: EBS Volume size for extra mount points
+
+  PubliclyAccessible:
+    Type: String
+    Description: Should nodes get public ips
+    Default: false
+    AllowedValues:
+      - 'true'
+      - 'false'
+
+Resources:
+
+  MasterNodeASG:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      DesiredCapacity: !Ref MasterNodeDesiredCapacity
+      LaunchConfigurationName: !Ref MasterNodeLaunchConfig
+      MaxSize: !Ref MasterNodeMaxFleetSize
+      MinSize: !Ref MasterNodeMinFleetSize
+      AutoScalingGroupName: !Join [ '', [ !Ref ClusterID, '-master-node-asg' ] ]
+      VPCZoneIdentifier: [ !Ref SubnetID ]
+      TargetGroupARNs:
+      - Fn::ImportValue: !Join [ '', [ !Ref ClusterID, '-m-tg-tls' ] ]
+      TerminationPolicies: [ NewestInstance ]
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-master-node-asg' ] ]
+        PropagateAtLaunch: true
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+        PropagateAtLaunch: true
+      - Key: ClusterID
+        Value: !Ref ClusterID
+        PropagateAtLaunch: true
+
+  MasterNodeLaunchConfig:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      AssociatePublicIpAddress: !Ref PubliclyAccessible
+      BlockDeviceMappings:
+      - DeviceName: /dev/sda1
+        Ebs:
+          DeleteOnTermination: true
+          VolumeSize: !Ref MasterNodeOSVolumeSize
+          VolumeType: gp2
+      - DeviceName: /dev/xvdb
+        Ebs:
+          DeleteOnTermination: true
+          Encrypted: true
+          VolumeSize: !Ref MasterNodeExtraVolumeSize
+          VolumeType: gp2
+      ImageId: !Ref AMIId
+      InstanceType: !Ref MasterNodeInstanceType
+      KeyName: !Ref MasterNodeKeyPairName
+      SecurityGroups:
+      - Fn::ImportValue: !Join [ '', [ !Ref ClusterID, '-master-node-sg' ] ]
+
+  InfraNodeASG:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      DesiredCapacity: !Ref InfraNodeDesiredCapacity
+      LaunchConfigurationName: !Ref InfraNodeLaunchConfig
+      MaxSize: !Ref InfraNodeMaxFleetSize
+      MinSize: !Ref InfraNodeMinFleetSize
+      AutoScalingGroupName: !Join [ '', [ !Ref ClusterID, '-infra-node-asg' ] ]
+      VPCZoneIdentifier: [ !Ref SubnetID ]
+      TargetGroupARNs:
+      - Fn::ImportValue: !Join [ '', [ !Ref ClusterID, '-i-tg-tls' ] ]
+      - Fn::ImportValue: !Join [ '', [ !Ref ClusterID, '-i-tg-80' ] ]
+      TerminationPolicies: [ NewestInstance ]
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-infra-node-asg' ] ]
+        PropagateAtLaunch: true
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+        PropagateAtLaunch: true
+      - Key: ClusterID
+        Value: !Ref ClusterID
+        PropagateAtLaunch: true
+
+  InfraNodeLaunchConfig:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      AssociatePublicIpAddress: !Ref PubliclyAccessible
+      BlockDeviceMappings:
+      - DeviceName: /dev/sda1
+        Ebs:
+          DeleteOnTermination: true
+          VolumeSize: !Ref InfraNodeOSVolumeSize
+          VolumeType: gp2
+      - DeviceName: /dev/xvdb
+        Ebs:
+          DeleteOnTermination: true
+          Encrypted: true
+          VolumeSize: !Ref InfraNodeExtraVolumeSize
+          VolumeType: gp2
+      ImageId: !Ref AMIId
+      InstanceType: !Ref InfraNodeInstanceType
+      KeyName: !Ref InfraNodeKeyPairName
+      SecurityGroups:
+      - Fn::ImportValue: !Join [ '', [ !Ref ClusterID, '-infra-node-sg' ] ]
+
+
+Outputs:
+
+  MasterNodeASG:
+    Description: Master node auto-scaling group
+    Value: !Ref MasterNodeASG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-master-node-asg' ] ]
+
+  InfraNodeASG:
+    Description: Infrastructure node auto-scaling group
+    Value: !Ref InfraNodeASG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-infra-node-asg' ] ]

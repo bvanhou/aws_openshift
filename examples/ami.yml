@@ -1,0 +1,170 @@
+# Name of resulting AMI
+ami_name: openshift-ami
+
+# Should the template EC2 instance get a public IP
+publicly_accessible: false
+
+# AWS environment information
+region: us-east-1
+availability_zone: us-east-1a
+vpc_id: vpc-34d5ac9s
+subnet_id: subnet-09392926
+
+# ID of AMI to use as base
+base_ami_id: ami-c998b6b2
+
+# Yum repositories to configure on servers
+ami_yum_repos:
+- name: rhel-7-server-rpms
+  desc: rhel-7-server-rpms
+  url: http://repo.example.com/repos/ocp/3.7/rhel-7-server-rpms
+
+# List of packages to install
+ami_install_packages:
+- dnsmasq
+- docker-1.12.6
+- atomic-openshift-utils
+- atomic-openshift
+- atomic-openshift-clients
+- atomic-openshift-excluder
+- atomic-openshift-sdn-ovs
+- atomic-openshift-node
+- openshift-ansible
+- openshift-ansible-callback-plugins
+- openshift-ansible-docs
+- openshift-ansible
+- openshift-ansible-callback-plugins
+- openshift-ansible-docs
+- openshift-ansible-filter-plugins
+- openshift-ansible-lookup-plugins
+- openshift-ansible-playbooks
+- openshift-ansible-roles
+- tuned-profiles-atomic-openshift-node
+- tuned
+- skopeo-containers
+- python-docker
+- oci-umount
+- oci-systemd-hook
+- wget
+- git
+- unzip
+- net-tools
+- bind-utils
+- iptables-services
+- bridge-utils
+- bash-completion
+- kexec-tools
+- sos
+- psacct
+- lvm2
+- rng-tools
+- ansible
+- apr
+- apr-util
+- bash-completion
+- bc
+- boost-system
+- boost-thread
+- bridge-utils
+- bzip2
+- ceph-common
+- conntrack-tools
+- device-mapper-multipath
+- ed
+- emacs-filesystem
+- glusterfs-fuse
+- hdparm
+- iscsi-initiator-utils
+- javapackages-tools
+- keyutils
+- libaio
+- libevent
+- libgnome-keyring
+- libjpeg-turbo
+- libnetfilter_cthelper
+- libnetfilter_queue
+- librados2
+- librbd1
+- libtirpc
+- lksctp-tools
+- m4
+- nfs-utils
+- perl
+- perl-Carp
+- perl-Encode
+- perl-Error
+- perl-Exporter
+- perl-File-Path
+- perl-File-Temp
+- perl-Filter
+- perl-HTTP-Tiny
+- perl-PathTools
+- perl-Pod-Escapes
+- perl-Pod-Perldoc
+- perl-Pod-Simple
+- perl-Pod-Usage
+- perl-Socket
+- perl-Storable
+- perl-TermReadKey
+- perl-Text-ParseWords
+- perl-Time-HiRes
+- perl-Time-Local
+- perl-constant
+- perl-libs
+- perl-macros
+- perl-parent
+- perl-podlators
+- perl-threads
+- perl-threads-shared
+- psacct
+- psmisc
+- python-cffi
+- python-click
+- python-docker
+- python-docker-pycreds
+- python-enum34
+- python-gobject-base
+- python-httplib2
+- python-idna
+- python-ipaddress
+- python-javapackages
+- python-paramiko
+- python-passlib
+- python-ply
+- python-pycparser
+- python-rados
+- python-rbd
+- python-setuptools
+- python2-jmespath
+- python2-pyasn1
+- python2-pysocks
+- python2-urllib3
+- redhat-lsb-core
+- socat
+- spax
+- sshpass
+- tcp_wrappers
+- time
+- wget
+- yajl
+
+# List of packages to remove
+ami_remove_packages:
+- qemu-guest-agent
+- rhn-check
+- rhnlib
+- rhn-client-tools
+- rhnsd
+- rhn-setup
+- yum-rhn-plugin
+- rh-amazon-rhui-client
+- Red_Hat_Enterprise_Linux_Release_Notes-7-en-US
+
+# User-scoped path for files used during cluster administration
+user_local_path: "{{ lookup('env', 'HOME') }}/etc/ansible"
+user_local_home: "{{ lookup('env', 'HOME') }}"
+user_remote_path: /home/ec2-user/etc/ansible
+user_remote_home: /home/ec2-user
+
+# DNS suffix of hosts
+host_suffix: ec2.internal

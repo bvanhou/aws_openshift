@@ -1,0 +1,23 @@
+- hosts: masters[0]
+  become: true
+  gather_facts: false
+  tasks:
+  - name: Get list of configured cluster nodes
+    shell: oc get nodes --no-headers | awk '{ print $1 }'
+    register: cluster_instances
+    changed_when: false
+
+- hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Get list of EC2 instances in autoscaling groups
+    shell: "aws ec2 describe-instances --filters Name=instance-state-name,Values=running Name=tag:ClusterID,Values={{ cluster_id }} | sed -e 's/ec2.internal/{{ host_suffix }}/' | jq -r '.Reservations[].Instances[].PrivateDnsName'"
+    register: deployed_instances
+
+  - name: Instances in cluster not in AWS
+    debug:
+      msg: "{{ hostvars[groups['masters'][0]].cluster_instances.stdout_lines | difference( deployed_instances.stdout_lines) | list }}"
+
+  - name: Instances in AWS not in cluster
+    debug:
+      msg: "{{ deployed_instances.stdout_lines | difference( hostvars[groups['masters'][0]].cluster_instances.stdout_lines) | list }}"

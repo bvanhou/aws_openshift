@@ -1,0 +1,108 @@
+- name: Set SSH host key checking
+  lineinfile:
+    dest: '/etc/ssh/ssh_config'
+    line: 'StrictHostKeyChecking no'
+
+- name: Check current repositories
+  find:
+    path: /etc/yum.repos.d
+    patterns: "^(?!custom-ocp).*repo$"
+    use_regex: true
+  register: current_repos
+  changed_when: false
+
+- name: Disable existing repositories
+  block:
+  - name: Remove repository directory
+    file:
+      path: /etc/yum.repos.d
+      state: absent
+
+  - name: Create repo directory
+    file:
+      path: /etc/yum.repos.d
+      state: directory
+  when: current_repos.matched != 0
+
+- name: Configure custom yum repositories
+  yum_repository:
+    name: "{{ item.name }}"
+    description: "{{ item.desc }}"
+    file: custom-ocp
+    baseurl: "{{ item.url}}"
+    enabled: yes
+    gpgcheck: no
+    sslverify: no
+  with_items: "{{ yum_repos }}"
+
+- name: Uninstall packages
+  yum:
+    name: "{{ item }}"
+    state: absent
+  with_items: "{{ remove_packages }}"
+  register: yum_uninstall
+  retries: 5
+  delay: 1
+  until: yum_uninstall.rc == 0
+
+- name: Update system packages
+  yum:
+    name: '*'
+    state: latest
+  register: yum_update
+  retries: 5
+  delay: 1
+  until: yum_update.rc == 0
+
+- name: Install packages
+  yum:
+    name: "{{ item }}"
+    state: installed
+  with_items: "{{ install_packages }}"
+  register: yum_install
+  retries: 5
+  delay: 1
+  until: yum_install.rc == 0
+
+- name: Copy CA Certificates
+  synchronize:
+    src: "{{ certificates_path }}"
+    dest: /etc/pki/ca-trust/source/anchors/
+    use_ssh_args: yes
+  register: copy_ca
+
+- name: Update certificate owner
+  file:
+    dest: /etc/pki/ca-trust/source/anchors/
+    owner: root
+    group: root
+    mode: 0600
+    recurse: yes
+  when: copy_ca.changed
+
+- name: Update CA trust
+  command: /usr/bin/update-ca-trust extract
+  when: copy_ca.changed
+
+- name: Start/enable services
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: true
+  with_items: "{{ started_enabled_services }}"
+
+- name: Reboot server on update
+  block:
+  - name: Reboot server
+    shell: sleep 10 && /sbin/shutdown -r now "System packages updated"
+    async: 300
+    poll: 0
+    become: true
+
+  - name: Wait for system to reboot
+    wait_for_connection:
+      connect_timeout: 20
+      sleep: 5
+      delay: 20
+      timeout: 300
+  when: yum_update.changed or yum_install.changed

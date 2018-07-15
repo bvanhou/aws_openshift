@@ -1,0 +1,15 @@
+
+# Yum repositories to configure on servers
+yum_repos: []
+
+# List of packages to install
+install_packages: []
+
+# List of packages to remove
+remove_packages: []
+
+# List of systemd services to start/enable
+started_enabled_services: []
+
+# Path to certificates to configure on host - make sure to include the trailing / (e.g. /path/to/certificates/)
+certificate_path: ""

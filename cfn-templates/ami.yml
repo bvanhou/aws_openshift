@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift AMI template
+
+Parameters:
+
+  VpcID:
+    Type: AWS::EC2::VPC::Id
+    Description: ID of the VPC to deploy EC2 instance into
+
+  SubnetID:
+    Type: AWS::EC2::Subnet::Id
+    Description: ID of the subnet to deploy EC2 instance into
+
+  BaseAMIID:
+    Type: AWS::EC2::Image::Id
+    Description: AMI ID to use as base
+
+  KeyPairName:
+    Type: AWS::EC2::KeyPair::KeyName
+    Description: EC2 keypair to use
+
+  PubliclyAccessible:
+    Type: String
+    Description: Should the EC2 instance get a public ip address
+    Default: false
+    AllowedValues:
+    - true
+    - false
+
+Resources:
+
+  AMITemplateSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupName: ocp-ami-template-sg
+      VpcId: !Ref VpcID
+      GroupDescription: Security group for AMI templates
+      Tags:
+      - Key: Name
+        Value: ocp-ami-template-sg
+
+  AMITemplateIngressSSHTCP:
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Properties:
+      GroupId: !GetAtt AMITemplateSG.GroupId
+      CidrIp: 0.0.0.0/0
+      IpProtocol: tcp
+      FromPort: 22
+      ToPort: 22
+
+  AMITemplateInstance:
+    Type: "AWS::EC2::Instance"
+    Properties:
+      ImageId: !Ref BaseAMIID
+      InstanceType: t2.small
+      KeyName: !Ref KeyPairName
+      NetworkInterfaces:
+      - AssociatePublicIpAddress: !Ref PubliclyAccessible
+        DeviceIndex: 0
+        SubnetId: !Ref SubnetID
+        GroupSet:
+        - !Ref AMITemplateSG
+      Tags:
+      - Key: Name
+        Value: ocp-ami-template
+
+Outputs:
+
+  AMITemplateInstanceID:
+    Description: AMI Template EC2 Instance ID
+    Value: !Ref AMITemplateInstance
+    Export:
+      Name: ocp-ami-template-id

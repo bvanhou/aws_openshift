@@ -1,0 +1,116 @@
+---
+- name: Generate dynamic host groups
+  hosts: localhost
+  tasks:
+  - name: Add bastion nodes to appropriate groups
+    add_host:
+      name: "{{ hostvars[item].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+      groups: bastion
+    changed_when: false
+    with_items: "{{ bastion_ips }}"
+
+  - name: Add master nodes to appropriate groups
+    add_host:
+      name: "{{ hostvars[item].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+      groups: master, etcd, nodes
+    changed_when: false
+    with_items: "{{ master_ips }}"
+
+  - name: Add infra nodes to appropriate groups
+    add_host:
+      name: "{{ hostvars[item].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+      groups: infra, nodes
+    changed_when: false
+    with_items: "{{ infra_ips }}"
+
+  - name: Add app nodes to appropriate groups
+    add_host:
+      name: "{{ hostvars[item].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+      groups: app, nodes
+    changed_when: false
+    with_items: "{{ app_ips }}"
+
+- name: Bootstrap bastion host
+  hosts: bastion
+  become: true
+  gather_facts: true
+  tasks:
+  - name: Get Master API NLB information from AWS
+    shell: "aws elbv2 describe-load-balancers --names {{ api_nlb_name }}"
+    changed_when: false
+    register: master_api_nlb
+    become: false
+    delegate_to: localhost
+
+  - name: Convert Master NLB DNS name into IP address
+    vars:
+      master_api_nlb_dns: "{{ (master_api_nlb.stdout | from_json).LoadBalancers[0].DNSName }}"
+    shell: "host {{ master_api_nlb_dns }} | sed -n -e '/address/s/^.* //p'"
+    ignore_errors: yes
+    changed_when: false
+    register: master_api_nlb_ip_resp
+    become: false
+    delegate_to: localhost
+
+  - name: Get HAProxy NLB information from AWS
+    shell: "aws elbv2 describe-load-balancers --names {{ app_nlb_name }}"
+    changed_when: false
+    register: infra_haproxy_nlb
+    become: false
+    delegate_to: localhost
+
+  - name: Convert HAProxy NLB DNS name into IP address
+    vars:
+      infra_haproxy_nlb_dns: "{{ (infra_haproxy_nlb.stdout | from_json).LoadBalancers[0].DNSName }}"
+    shell: "host {{ infra_haproxy_nlb_dns }} | sed -n -e '/address/s/^.* //p'"
+    ignore_errors: yes
+    register: infra_haproxy_nlb_ip_resp
+    changed_when: false
+    become: false
+    delegate_to: localhost
+
+  - name: Get subnet information
+    command: "aws ec2 describe-subnets --subnet-ids {{ (master_api_nlb.stdout | from_json).LoadBalancers[0].AvailabilityZones[0].SubnetId }}"
+    changed_when: false
+    register: subnet_facts
+    become: false
+    delegate_to: localhost
+
+  - name: Apply base configuration
+    vars:
+      install_packages: "{{ bastion_packages }}"
+      started_enabled_services:
+      - rngd
+      - dnsmasq
+      certificates_path: "{{ user_local_path }}/certificates/"
+    import_role:
+      name: base_bootstrap
+
+  - name: Apply bastion configuration
+    vars:
+      subnet_cidr: "{{ (subnet_facts.stdout | from_json).Subnets[0].CidrBlock }}"
+      master_api_nlb_ip: "{{ master_api_nlb_ip_resp.stdout }}"
+      infra_haproxy_nlb_ip: "{{ infra_haproxy_nlb_ip_resp.stdout }}"
+    import_role:
+      name: bastion_bootstrap
+
+- name: Bootstrap cluster hosts
+  hosts: nodes
+  become: true
+  gather_facts: true
+  tasks:
+  - name: Apply base configuration
+    vars:
+      install_packages: "{{ cluster_packages }}"
+      started_enabled_services:
+      - rngd
+      - docker
+      certificates_path: "{{ user_local_path }}/certificates/"
+    import_role:
+      name: base_bootstrap
+
+  - name: Apply cluster configuration
+    vars:
+      bastion_private_ip: "{{ hostvars[bastion_ips[0]].ec2_private_ip_address }}"
+    import_role:
+      name: cluster_bootstrap

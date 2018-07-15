@@ -1,0 +1,63 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift NLBs
+
+Parameters:
+
+  ClusterID:
+    Type: String
+    Description: Unique value identifying this OpenShift environment
+
+  SubnetID:
+    Type: String
+    Description: ID of the subnet to deploy EC2 instance into
+
+  AZ:
+    Type: String
+    Description: Availability Zone
+    Default: us-east-1a
+
+Resources:
+
+  MasterAPINLB:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: !Join [ '', [ !Ref ClusterID, '-master-api-nlb' ] ]
+      Scheme: internal
+      SubnetMappings: [ !Ref SubnetId ]
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-master-api-nlb' ] ]
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+      - Key: ClusterID
+        Value: !Ref ClusterID
+      Type: network
+
+  InfraHAProxyNLB:
+    Type: "AWS::ElasticLoadBalancingV2::LoadBalancer"
+    Properties:
+      Name: !Join [ '', [ !Ref ClusterID, '-infra-haproxy-nlb' ] ]
+      Scheme: internal
+      SubnetMappings: [ !Ref SubnetId ]
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-master-api-nlb' ] ]
+      - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+        Value: !Ref ClusterID
+      - Key: ClusterID
+        Value: !Ref ClusterID
+      Type: network
+
+Outputs:
+
+  MasterAPINLBARN:
+    Description: Master API NLB ARN
+    Value: !Ref MasterAPINLB
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-master-api-nlb' ] ]
+
+  InfraHAProxyNLBARN:
+    Description: Infra HAProxy NLB ARN
+    Value: !Ref InfraHAProxyNLB
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-infra-haproxy-nlb' ] ]

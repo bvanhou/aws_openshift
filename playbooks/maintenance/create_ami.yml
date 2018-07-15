@@ -1,0 +1,202 @@
+---
+- name: Create template EC2 instance
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Check if AMI already exists
+    command: "aws ec2 describe-images --region {{ region }} --filters Name=tag:Name,Values={{ ami_name }}"
+    changed_when: false
+    register: describe_image
+
+  - name: Fail if AMI already exists
+    fail:
+      msg: "AMI with name '{{ ami_name }}' already exists, rename your desired AMI"
+    when: (describe_image.stdout | from_json).Images | length > 0
+
+  - name: Ensure .ssh directory exists
+    file:
+      state: directory
+      path: "{{ user_local_home }}/.ssh"
+
+  - name: Create EC2 Keypair
+    ec2_key:
+      name: ocp-ami-template
+      state: present
+      region: "{{ region }}"
+    register: ami_ec2_key
+
+  - name: Create private key file
+    copy:
+      content: "{{ ami_ec2_key.key.private_key }}"
+      dest: "{{ user_local_home }}/.ssh/{{ ami_name }}.pem"
+      mode: 0600
+    when: ami_ec2_key.changed
+
+  - name: Create certificates directory
+    file:
+      state: directory
+      path: "{{ user_local_path }}/certificates/"
+
+  - name: Fetch certificates for cluster infrastructure
+    copy:
+      src: /etc/pki/ca-trust/source/anchors/
+      dest: "{{ user_local_path }}/certificates/"
+
+  - name: Remove CA from certificates directory
+    file:
+      path: "{{ user_local_path }}/certificates/ca.crt"
+      state: absent
+
+  - name: Deploy AMI template CloudFormation stack
+    cloudformation:
+      stack_name: ocp-ami-template
+      state: present
+      region: "{{ region }}"
+      disable_rollback: true
+      template: ../../cfn-templates/ami.yml
+      template_parameters:
+        VpcID: "{{ vpc_id }}"
+        SubnetID:  "{{ subnet_id }}"
+        BaseAMIID: "{{ base_ami_id }}"
+        KeyPairName: ocp-ami-template
+        PubliclyAccessible: "{{ publicly_accessible | lower | default(false)| string }}"
+      tags:
+        Stack: ocp-ami-template
+    register: cloudformation_output
+
+  - name: Wait until instance is running
+    ec2_instance_facts:
+      region: "{{ region }}"
+      filters:
+        instance-id: "{{ cloudformation_output.stack_outputs.AMITemplateInstanceID }}"
+        instance-state-name: running
+    register: instance_status
+    retries: 100
+    delay: 10
+    until: instance_status.instances | length == 1
+
+  - name: Wait until instance is passing health checks
+    command: "aws ec2 describe-instance-status --instance-ids {{ cloudformation_output.stack_outputs.AMITemplateInstanceID }}"
+    changed_when: false
+    register: instance_statuses
+    until: "'initializing' not in ((instance_statuses.stdout | from_json).InstanceStatuses | map(attribute='SystemStatus.Status') | list) and 'initializing' not in ((instance_statuses.stdout | from_json).InstanceStatuses | map(attribute='InstanceStatus.Status') | list)"
+    retries: 100
+    delay: 10
+
+  - name: Create SSH configuration
+    vars:
+      public_ip: "{{ instance_status.instances[0].public_ip_address | default('') }}"
+      private_ip: "{{ instance_status.instances[0].private_ip_address }}"
+      dns_name: "{{ instance_status.instances[0].private_dns_name | regex_replace('ec2.internal', host_suffix)  }}"
+    blockinfile:
+      path: "{{ user_local_home }}/.ssh/config"
+      create: true
+      marker: "# Temporary ocp-ami-template configuration for ami {{ ami_name }}"
+      block: |
+        Host {{ publicly_accessible | ternary(public_ip, private_ip) }} {{ dns_name }}
+          Hostname {{ publicly_accessible | ternary(public_ip, private_ip) }}
+          IdentityFile {{ user_local_home }}/.ssh/{{ ami_name }}.pem
+          PasswordAuthentication no
+          PreferredAuthentications publickey
+          ProxyCommand none
+          StrictHostKeyChecking no
+          User ec2-user
+
+  - name: Add template EC2 instance to nodes group
+    add_host:
+      groups: nodes, app
+      name: "{{ instance_status.instances[0].private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+
+- hosts: nodes
+  become: true
+  tasks:
+  - name: Apply base configuration
+    vars:
+      install_packages: "{{ ami_install_packages }}"
+      remove_packages: "{{ ami_remove_packages }}"
+      certificates_path: "{{ user_local_path }}/certificates/"
+      yum_repos: "{{ ami_yum_repos }}"
+      started_enabled_services:
+      - rngd
+      - docker
+    import_role:
+      name: base_bootstrap
+
+- name: Create AMI and cleanup
+  hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: Stop EC2 instance
+    ec2:
+      state: stopped
+      instance_ids: "{{ instance_status.instances[0].instance_id }}"
+      region: "{{ region }}"
+      wait: true
+
+  - name: Create AMI from EC2 instance (This will take a few minutes)
+    ec2_ami:
+      description: Custom AMI for use with OpenShift deployments
+      instance_id: "{{ instance_status.instances[0].instance_id }}"
+      name: "{{ ami_name }}-unencrypted"
+      region: "{{ region }}"
+      wait: true
+    register: ami_info
+
+  - name: Encrypt AMI
+    ec2_ami_copy:
+      name: "{{ ami_name }}"
+      source_region: "{{ region }}"
+      region: "{{ region }}"
+      source_image_id: "{{ ami_info.image_id }}"
+      encrypted: yes
+      wait: yes
+      tags:
+        Name: "{{ ami_name }}"
+    register: new_ami
+
+  - name: Delete unencrypted AMI
+    ec2_ami:
+      state: absent
+      image_id: "{{ ami_info.image_id }}"
+      region: "{{ region }}"
+      wait: true
+
+  - name: Delete SSH configuration
+    vars:
+      public_ip: "{{ instance_status.instances[0].public_ip_address | default('') }}"
+      private_ip: "{{ instance_status.instances[0].private_ip_address }}"
+      dns_name: "{{ instance_status.instances[0].private_dns_name | regex_replace('ec2.internal', host_suffix)  }}"
+    blockinfile:
+      state: absent
+      path: "{{ user_local_home }}/.ssh/config"
+      create: true
+      marker: "# Temporary ocp-ami-template configuration for ami {{ ami_name }}"
+      block: |
+        Host {{ publicly_accessible | ternary(public_ip, private_ip) }} {{ dns_name }}
+          Hostname {{ publicly_accessible | ternary(public_ip, private_ip) }}
+          IdentityFile {{ user_local_home }}/.ssh/{{ ami_name }}.pem
+          PasswordAuthentication no
+          PreferredAuthentications publickey
+          ProxyCommand none
+          StrictHostKeyChecking no
+          User ec2-user
+
+  - name: Delete AMI template CloudFormation stack
+    cloudformation:
+      stack_name: ocp-ami-template
+      state: absent
+      region: "{{ region }}"
+
+  - name: Delete private key file
+    file:
+      path: "{{ user_local_home }}/.ssh/{{ ami_name }}"
+      state: absent
+
+  - name: Delete EC2 Keypair
+    ec2_key:
+      name: ocp-ami-template
+      state: absent
+      region: "{{ region }}"
+
+  - debug:
+      msg: "The ID of AMI {{ ami_name }} is {{ new_ami.image_id }}"

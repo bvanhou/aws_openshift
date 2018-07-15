@@ -1,0 +1,120 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift bastion hosts
+
+Parameters:
+
+  ClusterID:
+    Type: String
+    Description: Unique value identifying this OpenShift environment
+
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: ID of the VPC to deploy EC2 instance into
+
+  SubnetID:
+    Type: String
+    Description: ID of the subnet to deploy EC2 instance into
+
+  AZ:
+    Type: String
+    Description: Availability Zone
+    Default: us-east-1a
+
+  AMIId:
+    Type: String
+    Description: ID of AMI to use for EC2 instance
+
+  BastionNodeInstanceType:
+    Type: String
+    Description: EC2 instance type
+
+  BastionNodeKeyPairName:
+    Type: 'AWS::EC2::KeyPair::KeyName'
+    Description: EC2 key pair name
+
+  PubliclyAccessible:
+    Type: String
+    Description: Should the EC2 instance get a public ip address
+    Default: false
+    AllowedValues:
+    - true
+    - false
+
+Metadata:
+
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: Environment
+      Parameters:
+      - ClusterID
+      - VpcID
+      - SubnetID
+      - AZ
+    - Label:
+        default: EC2 Instance Configuration
+      Parameters:
+      - BastionNodeInstanceType
+      - AMIId
+      - BastionNodeKeyPairName
+    ParameterLabels:
+      ClusterID:
+        default: Environment Name
+      VpcID:
+        default: VPC ID
+      SubnetID:
+        default: Public Subnet ID
+      AZ:
+        default: Availability Zone
+      AMIId:
+        default: AMI ID
+      BastionNodeInstanceType:
+        default: Bastion Node Instance Type
+      BastionNodeKeyPairName:
+        default: EC2 Key Pair Name
+      PubliclyAccessible:
+        default: Publicly Accessible
+
+Resources:
+
+  BastionNodeASG:
+    Type: 'AWS::AutoScaling::AutoScalingGroup'
+    Properties:
+      DesiredCapacity: 1
+      LaunchConfigurationName: !Ref BastionNodeLaunchConfig
+      MaxSize: 2
+      MinSize: 1
+      AutoScalingGroupName: !Join [ '', [ !Ref ClusterID, '-bastion-node-asg' ] ]
+      VPCZoneIdentifier: [ !Ref SubnetID ]
+      TerminationPolicies: [ NewestInstance ]
+      Tags:
+      - Key: Name
+        Value: !Join [ '', [ !Ref ClusterID, '-bastion-node-asg' ] ]
+        PropagateAtLaunch: true
+      - Key: ClusterID
+        Value: !Ref ClusterID
+        PropagateAtLaunch: true
+
+  BastionNodeLaunchConfig:
+    Type: 'AWS::AutoScaling::LaunchConfiguration'
+    Properties:
+      AssociatePublicIpAddress: !Ref PubliclyAccessible
+      BlockDeviceMappings:
+      - DeviceName: /dev/sda1
+        Ebs:
+          DeleteOnTermination: 'true'
+          VolumeSize: '32'
+          VolumeType: gp2
+      ImageId: !Ref AMIId
+      InstanceType: !Ref BastionNodeInstanceType
+      KeyName: !Ref BastionNodeKeyPairName
+      SecurityGroups:
+      - Fn::ImportValue: !Join [ '', [ !Ref ClusterID, '-bastion-node-sg' ] ]
+
+Outputs:
+
+  BastionNodeASG:
+    Description: Bastion node auto-scaling group
+    Value: !Ref BastionNodeASG
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-bastion-node-asg' ] ]

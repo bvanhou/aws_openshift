@@ -1,0 +1,44 @@
+---
+# AWS environment parameters
+vpc_id: vpc-44d5ac4f
+
+# Hostname conventions
+dns_region: nam
+dns_environment: d
+
+# OpenShift API port
+api_port: 8443
+
+# OpenShift docker registry configuration
+openshift_docker_additional_registries: 'registry.example.com:5000'
+openshift_docker_blocked_registries: 'registry.hub.docker.com'
+
+# OpenShift default image configuration
+oreg_url: registry.access.redhat.com/openshift3/ose-${component}:${version}
+openshift_examples_modify_imagestreams: false
+
+# Cluster IAM user
+iam_account_id: AKIAI7DHHAO8E6KPVAA
+iam_account_key: mfXM3e8IRJx85UedoBUkpNp+h/zpZkUKDLciLQP5
+
+# Upstream DNS for local bastion dns
+upstream_dns: 8.8.8.8
+
+# AMI Image ID for RHEL on AWS
+ami_id: ami-c998b6b2
+
+# EC2 instance name suffix (hostname) which is added when AWS provision the instances
+host_suffix: ec2.internal
+
+# Yum repositories to configure on servers
+yum_repos:
+- name: rhel-7-server-rpms
+  desc: rhel-7-server-rpms
+  url: http://repo.example.com/repos/ocp/3.7/rhel-7-server-rpms
+
+# Cluster configuration - GENERATED DO NOT TOUCH
+cluster_environment: {{ cluster_environment }}
+cluster_number: {{ cluster_number }}
+availability_zone: {{ availability_zone }}
+api_nlb_name: {{ api_nlb_name }}
+app_nlb_name: {{ app_nlb_name }}

@@ -1,0 +1,1596 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Deploys openshift security groups into an existing VPC
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+      - Label:
+          default: Deployment ClusterID
+        Parameters:
+          - VpcID
+          - ClusterID
+          - AZ
+    ParameterLabels:
+      ClusterID:
+        default: ClusterID Name
+      VpcID:
+        default: VPC ID
+  'AWS::CloudFormation::Designer':
+    30eff15b-c412-40c8-bb72-6a5b139ae71f:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 90
+        'y': 30
+      z: 1
+      embeds: []
+    b831263d-594d-4dc9-bddf-339ac68f1474:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    37fd5bfa-6aea-436c-8f78-48fcbc2f1c2d:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    20725ac2-5fcb-4fae-91ee-c88c7bb28775:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    471d1439-9db9-44c7-aceb-66d62abcb5ae:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    7271e6d9-941f-4ee9-aa71-79aa6d99ca32:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    ea344cba-d8d6-4e95-a515-711d911e2abc:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    d8deaae1-f19d-470a-837f-7fc4cb21561a:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    986a694a-3b7f-4d96-bf07-892e6e850885:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 240
+        'y': 30
+      z: 1
+      embeds: []
+    222bb0bf-5603-4b49-aa37-b9f8146d8516:
+      source:
+        id: 986a694a-3b7f-4d96-bf07-892e6e850885
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    ad7a7bc1-677a-4dcc-8ac2-1da5fec57d2e:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 986a694a-3b7f-4d96-bf07-892e6e850885
+      z: 1
+    2a158f82-2fce-4640-b99e-d767de036cc1:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 30
+        'y': 180
+      z: 1
+      embeds: []
+    5757e36d-bf03-4c01-9f2d-6dbb59532883:
+      source:
+        id: 2a158f82-2fce-4640-b99e-d767de036cc1
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 120
+        'y': 240
+      z: 1
+      embeds: []
+    e62ca002-073a-4fbf-95c1-62eabb04204f:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    71a90c3e-3429-4d41-a698-9c53e17cc689:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    43575738-cdd0-43ab-858a-2fb6f0455f1d:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    a95d9e28-3153-4ae7-b617-7a5b31833229:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    a6d5909f-84ff-4091-9387-2a129556a8cb:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    b4aa3253-0352-41a0-9858-ae782234df0f:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 986a694a-3b7f-4d96-bf07-892e6e850885
+      z: 1
+    293953ce-ad71-432e-929b-d9cc6c375e37:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    4afd9441-7298-4982-9e91-6f39c2f5e1ed:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    934d2e5f-4760-4332-9d5d-897eae4a34e4:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    974e0dce-425f-4070-95c2-1ee6d6445769:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    945831e9-ca43-4faf-817f-e863856a7a99:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 240
+        'y': 240
+      z: 1
+      embeds: []
+    5f00cb55-03b6-4139-beea-e7540f44a3f6:
+      source:
+        id: 945831e9-ca43-4faf-817f-e863856a7a99
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    6c482c42-9bb1-47bf-8213-9dc55d9194d2:
+      source:
+        id: 945831e9-ca43-4faf-817f-e863856a7a99
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    8b0b6a76-697a-4a1a-a266-64935c68ca13:
+      source:
+        id: 945831e9-ca43-4faf-817f-e863856a7a99
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    9eb1bb22-99ca-42f4-b2e5-2a03f20582fc:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 300
+        'y': 180
+      z: 1
+      embeds: []
+    4279c436-2e72-435f-8f26-50b1aeee646a:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    3d57a480-0777-4bbb-b998-e195e81dbec9:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    c0370c06-db6b-49c4-9204-66d117d3ec62:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    aab1f7d1-157e-4406-9c79-38345a04f5c4:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    2ab17dea-d9c8-49f6-bb29-a6a1176c19f2:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    b83678a7-fd31-4cd9-acbf-107f52b85345:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 986a694a-3b7f-4d96-bf07-892e6e850885
+      z: 1
+    aec7f25b-7870-4068-8517-a077fa93ea58:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    3650c7f4-8fb1-4233-9ba9-e793fafc3159:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    da03f989-ad79-4517-b153-91afedd30bc1:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      z: 1
+    b0f67311-68e6-4239-885d-c3b99232dbfa:
+      source:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      target:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      z: 1
+    73ec3750-4726-4c64-87c8-46ec74f390e3:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      z: 1
+    2e91182a-7ab3-4e3f-b6ce-0aa9ce86ae80:
+      source:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      target:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      z: 1
+    7d949852-b412-4c2b-8bac-94d50b7d79b2:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      z: 1
+    1ac32d84-0380-473c-a4f1-e845b1087615:
+      source:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      target:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      z: 1
+    a51b18fe-80e5-4916-9373-7e2330e18f9d:
+      size:
+        width: 60
+        height: 60
+      position:
+        x: 390
+        'y': 90
+      z: 1
+      embeds: []
+    eff2876b-0145-4841-8066-2c23562332e7:
+      source:
+        id: a51b18fe-80e5-4916-9373-7e2330e18f9d
+      target:
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+      z: 1
+    2bd93d63-4dec-4222-a9a1-4bee3bb7b962:
+      source:
+        id: a51b18fe-80e5-4916-9373-7e2330e18f9d
+      target:
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+      z: 1
+    73059ec9-9c8b-4fad-a43a-a3b46afe35fb:
+      source:
+        id: a51b18fe-80e5-4916-9373-7e2330e18f9d
+      target:
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+      z: 1
+Outputs:
+  BastionNodeSG:
+    Description: Application node security group
+    Export:
+      Name:
+        'Fn::Join':
+          - ''
+          - - Ref: ClusterID
+            - '-bastion-sg'
+    Value:
+      'Fn::Join':
+        - ''
+        - - 'Fn::GetAtt': BastionNodeSG.GroupId
+  AppNodeSG:
+    Description: Application node security group
+    Export:
+      Name:
+        'Fn::Join':
+          - ''
+          - - Ref: ClusterID
+            - '-ocp-cluster-app-sg'
+    Value:
+      'Fn::Join':
+        - ''
+        - - 'Fn::GetAtt': AppNodeSG.GroupId
+  InfraNodeSG:
+    Description: Infrastructure node security group
+    Export:
+      Name:
+        'Fn::Join':
+          - ''
+          - - Ref: ClusterID
+            - '-ocp-cluster-infra-sg'
+    Value:
+      'Fn::Join':
+        - ''
+        - - 'Fn::GetAtt': InfraNodeSG.GroupId
+  MasterNodeSG:
+    Description: Master node security group
+    Export:
+      Name:
+        'Fn::Join':
+          - ''
+          - - Ref: ClusterID
+            - '-ocp-cluster-master-sg'
+    Value:
+      'Fn::Join':
+        - ''
+        - - 'Fn::GetAtt': MasterNodeSG.GroupId
+  MasterExtELBSG:
+    Description: Master External ELB security group
+    Export:
+      Name:
+        'Fn::Join':
+          - ''
+          - - Ref: ClusterID
+            - '-master-ext-elb-sg'
+    Value:
+      'Fn::Join':
+        - ''
+        - - 'Fn::GetAtt': MasterExtELBSG.GroupId
+  MasterIntELBSG:
+    Description: Master Internal ELB security group
+    Export:
+      Name:
+        'Fn::Join':
+          - ''
+          - - Ref: ClusterID
+            - '-master-int-elb-sg'
+    Value:
+      'Fn::Join':
+        - ''
+        - - 'Fn::GetAtt': MasterIntELBSG.GroupId
+  InfraNodeELBSG:
+    Description: Master Internal ELB security group
+    Export:
+      Name:
+        'Fn::Join':
+          - ''
+          - - Ref: ClusterID
+            - '-infra-elb-sg'
+    Value:
+      'Fn::Join':
+        - ''
+        - - 'Fn::GetAtt': InfraNodeELBSG.GroupId
+Parameters:
+  AZ:
+    AllowedValues:
+      - us-east-1a
+      - us-east-1b
+      - us-east-1c
+      - us-east-1d
+      - us-east-1e
+      - us-east-1f
+      - us-west-1a
+      - us-west-1b
+      - us-west-1c
+      - us-west-2a
+      - us-west-2b
+      - us-west-2c
+    Default: us-east-1a
+    Description: Availability Zone
+    Type: String
+  ClusterID:
+    Default: staging
+    Description: ClusterID Name to deploy security groups into
+    Type: String
+    AllowedValues:
+      - prod
+      - staging
+      - sandbox
+      - test
+      - uat
+      - dev
+  VpcID:
+    Default: vpc-0000000
+    Description: ID of the VPC to deploy security groups into
+    Type: 'AWS::EC2::VPC::Id'
+Resources:
+  # Bastion SG Configuration  
+
+  BastionNodeSG:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+      GroupDescription: Bastion Node Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-bastion-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+        - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+          Value: !Ref ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: a51b18fe-80e5-4916-9373-7e2330e18f9d
+  BastionNodeIngressTCP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '22'
+      GroupId:
+        'Fn::GetAtt':
+          - BastionNodeSG
+          - GroupId
+      IpProtocol: tcp
+      ToPort: '22'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+  BastionNodeIngressUDP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '53'
+      GroupId:
+        'Fn::GetAtt':
+          - BastionNodeSG
+          - GroupId
+      IpProtocol: udp
+      ToPort: '53'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+
+  # App SG Configuration  
+
+  AppNodeEgressTCP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '0'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: tcp
+      ToPort: '65535'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  AppNodeEgressUDP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '0'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: udp
+      ToPort: '65535'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  AppNodeIngressAppKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 1ac32d84-0380-473c-a4f1-e845b1087615
+  AppNodeIngressAppSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 7d949852-b412-4c2b-8bac-94d50b7d79b2
+  AppNodeIngressBastionSSH:
+    Properties:
+      FromPort: '22'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - BastionNodeSG
+          - GroupId
+      ToPort: '22'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 73059ec9-9c8b-4fad-a43a-a3b46afe35fb
+  AppNodeIngressInfraKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 2e91182a-7ab3-4e3f-b6ce-0aa9ce86ae80
+  AppNodeIngressInfraSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 73ec3750-4726-4c64-87c8-46ec74f390e3
+  AppNodeIngressMasterKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: b0f67311-68e6-4239-885d-c3b99232dbfa
+  AppNodeIngressMasterSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: da03f989-ad79-4517-b153-91afedd30bc1
+  AppNodeSG:
+    Properties:
+      GroupDescription: Application Node Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-app-node-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+        - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+          Value: !Ref ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Type: 'AWS::EC2::SecurityGroup'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 9eb1bb22-99ca-42f4-b2e5-2a03f20582fc
+
+  # Infra Node ELB Security Group Configuration
+
+  InfraNodeELBEgressHTTP:
+    Properties:
+      FromPort: '80'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '80'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  InfraNodeELBEgressHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  InfraNodeELBEgressHealthCheck:
+    Properties:
+      FromPort: '1936'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '1936'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  InfraNodeELBIngressHTTP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '80'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      IpProtocol: tcp
+      ToPort: '80'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+  InfraNodeELBIngressHTTPS:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      IpProtocol: tcp
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+  InfraNodeELBSG:
+    Properties:
+      GroupDescription: Infrastructure ELB Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-infra-elb-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+        - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+          Value: !Ref ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Type: 'AWS::EC2::SecurityGroup'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 945831e9-ca43-4faf-817f-e863856a7a99
+  InfraNodeEgressTCP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '0'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      ToPort: '65535'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+
+  # Infra Node Security Group Configuration
+
+  InfraNodeEgressUDP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '0'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: udp
+      ToPort: '65535'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  InfraNodeIngressAppKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 3650c7f4-8fb1-4233-9ba9-e793fafc3159
+  InfraNodeIngressAppSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: aec7f25b-7870-4068-8517-a077fa93ea58
+  InfraNodeIngressBastionSSH:
+    Properties:
+      FromPort: '22'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - BastionNodeSG
+          - GroupId
+      ToPort: '22'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 2bd93d63-4dec-4222-a9a1-4bee3bb7b962
+  InfraNodeIngressInfraKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 974e0dce-425f-4070-95c2-1ee6d6445769
+  InfraNodeIngressInfraNodeELBHTTP:
+    Properties:
+      FromPort: '80'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      ToPort: '80'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 8b0b6a76-697a-4a1a-a266-64935c68ca13
+  InfraNodeIngressInfraNodeELBHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 6c482c42-9bb1-47bf-8213-9dc55d9194d2
+  InfraNodeIngressInfraNodeELBHealthCheck:
+    Properties:
+      FromPort: '1936'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeELBSG
+          - GroupId
+      ToPort: '1936'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 5f00cb55-03b6-4139-beea-e7540f44a3f6
+  InfraNodeIngressInfraSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 934d2e5f-4760-4332-9d5d-897eae4a34e4
+  InfraNodeIngressMasterKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 4afd9441-7298-4982-9e91-6f39c2f5e1ed
+  InfraNodeIngressMasterSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 293953ce-ad71-432e-929b-d9cc6c375e37
+  InfraNodeSG:
+    Properties:
+      GroupDescription: Infrastructure Node Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-infra-node-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+        - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+          Value: !Ref ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Type: 'AWS::EC2::SecurityGroup'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 86bd1c61-db27-4dd9-a4d3-3b3d7a8528c1
+  
+  # Master Ext ELB Security Group Configuration
+
+  MasterExtELBEgressHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterExtELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  MasterExtELBIngressHTTPS:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterExtELBSG
+          - GroupId
+      IpProtocol: tcp
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+  MasterExtELBSG:
+    Properties:
+      GroupDescription: Master Node ELB Ingress Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-master-ext-elb-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+        - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+          Value: !Ref ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Type: 'AWS::EC2::SecurityGroup'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 2a158f82-2fce-4640-b99e-d767de036cc1
+  
+  # Master Int ELB Security Group Configuration
+  
+  MasterIntELBEgressHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  MasterIntELBIngressAppHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: b83678a7-fd31-4cd9-acbf-107f52b85345
+  MasterIntELBIngressInfraHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: b4aa3253-0352-41a0-9858-ae782234df0f
+  MasterIntELBIngressMasterHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntELBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ad7a7bc1-677a-4dcc-8ac2-1da5fec57d2e
+  MasterIntELBSG:
+    Properties:
+      GroupDescription: Master Node ELB Ingress Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-master-int-elb-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+        - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+          Value: !Ref ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Type: 'AWS::EC2::SecurityGroup'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 986a694a-3b7f-4d96-bf07-892e6e850885
+  
+  # Master Node Security Group Configuration
+
+  MasterNodeEgressTCP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '0'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      ToPort: '65535'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  MasterNodeEgressUDP:
+    Properties:
+      CidrIp: 0.0.0.0/0
+      FromPort: '0'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: udp
+      ToPort: '65535'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  MasterNodeIngressAppDNSTCP:
+    Properties:
+      FromPort: '8053'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '8053'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 2ab17dea-d9c8-49f6-bb29-a6a1176c19f2
+  MasterNodeIngressAppDNSUDP:
+    Properties:
+      FromPort: '8053'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '8053'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: aab1f7d1-157e-4406-9c79-38345a04f5c4
+  MasterNodeIngressAppHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: c0370c06-db6b-49c4-9204-66d117d3ec62
+  MasterNodeIngressAppKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 3d57a480-0777-4bbb-b998-e195e81dbec9
+  MasterNodeIngressAppSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 4279c436-2e72-435f-8f26-50b1aeee646a
+  MasterNodeIngressBastionSSH:
+    Properties:
+      FromPort: '22'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - BastionNodeSG
+          - GroupId
+      ToPort: '22'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: eff2876b-0145-4841-8066-2c23562332e7
+  MasterNodeIngressETCD:
+    Properties:
+      FromPort: '2379'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '2379'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: d8deaae1-f19d-470a-837f-7fc4cb21561a
+  MasterNodeIngressETCDPeering:
+    Properties:
+      FromPort: '2380'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '2380'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ea344cba-d8d6-4e95-a515-711d911e2abc
+  MasterNodeIngressExtELBHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterExtELBSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 5757e36d-bf03-4c01-9f2d-6dbb59532883
+  MasterNodeIngressInfraDNSTCP:
+    Properties:
+      FromPort: '8053'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '8053'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: a6d5909f-84ff-4091-9387-2a129556a8cb
+  MasterNodeIngressInfraDNSUDP:
+    Properties:
+      FromPort: '8053'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '8053'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: a95d9e28-3153-4ae7-b617-7a5b31833229
+  MasterNodeIngressInfraHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 43575738-cdd0-43ab-858a-2fb6f0455f1d
+  MasterNodeIngressInfraKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 71a90c3e-3429-4d41-a698-9c53e17cc689
+  MasterNodeIngressInfraSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: e62ca002-073a-4fbf-95c1-62eabb04204f
+  MasterNodeIngressIntELBHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterIntELBSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 222bb0bf-5603-4b49-aa37-b9f8146d8516
+  MasterNodeIngressMasterDNSTCP:
+    Properties:
+      FromPort: '8053'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '8053'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 7271e6d9-941f-4ee9-aa71-79aa6d99ca32
+  MasterNodeIngressMasterDNSUDP:
+    Properties:
+      FromPort: '8053'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '8053'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 471d1439-9db9-44c7-aceb-66d62abcb5ae
+  MasterNodeIngressMasterHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 20725ac2-5fcb-4fae-91ee-c88c7bb28775
+  MasterNodeIngressMasterKubelet:
+    Properties:
+      FromPort: '10250'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '10250'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 37fd5bfa-6aea-436c-8f78-48fcbc2f1c2d
+  MasterNodeIngressMasterSDN:
+    Properties:
+      FromPort: '4789'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      IpProtocol: udp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '4789'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: b831263d-594d-4dc9-bddf-339ac68f1474
+  MasterNodeSG:
+    Properties:
+      GroupDescription: Master Node Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-master-node-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+        - Key: !Join [ '', [ 'kubernetes.io/cluster/', !Ref ClusterID ] ]
+          Value: !Ref ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Type: 'AWS::EC2::SecurityGroup'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 30eff15b-c412-40c8-bb72-6a5b139ae71f
+
+
+# Network Load Balancer Security Group Configuration
+  MasterIntNLBEgressHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntNLBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupEgress'
+  MasterIntNLBIngressAppHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntNLBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - AppNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: b83678a7-fd31-4cd9-acbf-107f52b85345
+  MasterIntNLBIngressInfraHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntNLBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - InfraNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: b4aa3253-0352-41a0-9858-ae782234df0f
+  MasterIntNLBIngressMasterHTTPS:
+    Properties:
+      FromPort: '443'
+      GroupId:
+        'Fn::GetAtt':
+          - MasterIntNLBSG
+          - GroupId
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        'Fn::GetAtt':
+          - MasterNodeSG
+          - GroupId
+      ToPort: '443'
+    Type: 'AWS::EC2::SecurityGroupIngress'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: ad7a7bc1-677a-4dcc-8ac2-1da5fec57d2e
+  MasterIntNLBSG:
+    Properties:
+      GroupDescription: Master Node NLB Ingress Security Group
+      Tags:
+        - Key: Name
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+                - '-master-int-nlb-sg'
+        - Key: ClusterID
+          Value:
+            'Fn::Join':
+              - ''
+              - - Ref: ClusterID
+      VpcId:
+        'Fn::Join':
+          - ''
+          - - Ref: VpcID
+    Type: 'AWS::EC2::SecurityGroup'
+    Metadata:
+      'AWS::CloudFormation::Designer':
+        id: 986a694a-3b7f-4d96-bf07-892e6e850885

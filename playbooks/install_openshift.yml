@@ -1,0 +1,97 @@
+---
+- name: Generate OpenShift hosts file locally
+  hosts: localhost
+  gather_facts: true
+  tasks:
+  - name: Ensure inventory directory exists
+    file:
+      path: "{{ user_local_path }}/inventory"
+      state: directory
+
+  - name: Dynamically create OpenShift Ansible inventory file
+    vars:
+      new_nodes: []
+    template:
+      src: "../templates/hosts.j2"
+      dest: "{{ user_local_path }}/inventory/{{ cluster_id }}-hosts"
+      backup: yes
+
+  - name: Add bastion nodes to appropriate groups
+    add_host:
+      name: "{{ hostvars[item].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+      groups: bastion
+    changed_when: false
+    with_items: "{{ bastion_ips }}"
+
+- name: Run OpenShift installer
+  hosts: bastion
+  gather_facts: true
+  vars:
+    hosts_file: "{{ user_remote_path }}/inventory/{{ cluster_id }}-hosts"
+    installer_playbook: /usr/share/ansible/openshift-ansible/playbooks/byo/config.yml
+    bastion_proxy: false
+  tasks:
+  - name: Create ansible config
+    copy:
+      src: ../ansible.cfg
+      dest: "{{ user_remote_home }}/ansible.cfg"
+
+  - name: Create callback directory
+    file:
+      state: directory
+      path: "{{ user_remote_home }}/callback"
+
+  - name: Create callpack plugins
+    copy:
+      src: ../callback/memory.py
+      dest: "{{ user_remote_home }}/callback/memory.py"
+      mode: 0744
+
+  - name: Ensure inventory directories exists
+    file:
+      path: "{{ user_remote_path }}/{{ item }}"
+      state: directory
+    with_items:
+    - inventory
+    - logs
+
+  - name: Create OpenShift Ansible inventory file on Bastion
+    vars:
+      new_nodes: []
+    template:
+      src: "../templates/hosts.j2"
+      dest: "{{ hosts_file }}"
+      backup: yes
+
+  - name: Create ssh keys
+    copy:
+      src: "{{ user_local_home }}/.ssh/{{ item }}"
+      dest: "{{ user_remote_home }}/.ssh/{{ item }}"
+      mode: 0600
+    with_items:
+    - "{{ master_key_pair }}.pem"
+    - "{{ node_key_pair }}.pem"
+
+  - name: Generate ssh config
+    vars:
+      home_dir: "{{ user_remote_home }}"
+      local_path: "{{ user_remote_path }}"
+    import_role:
+      name: ssh_config
+
+  - name: Install OpenShift (this will take some time)
+    shell: "/usr/bin/ansible-playbook -i {{ hosts_file }} {{ installer_playbook }} >> {{ user_remote_path}}/logs/{{ cluster_id }}-ocp-install-$(date +%Y%m%d-%H%M%S).log 2>&1"
+    args:
+      chdir: "{{ user_remote_home }}"
+
+#  - name: Cleanup files
+#    file:
+#      state: absent
+#      path: "{{ item }}"
+#    with_items:
+#    - "{{ user_remote_home }}/ansible.cfg"
+#    - "{{ user_remote_home }}/.ssh/{{ master_key_pair }}.pem"
+#    - "{{ user_remote_home }}/.ssh/{{ node_key_pair }}.pem"
+#    - "{{ user_remote_home }}/.ssh/config"
+#    - "{{ user_remote_home }}/.ssh/known_hosts"
+#    - "{{ user_remote_path }}"

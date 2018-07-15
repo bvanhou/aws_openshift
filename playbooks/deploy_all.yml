@@ -1,0 +1,6 @@
+---
+- import_playbook: "{{ playbook_dir }}/deploy_aws_infrastructure.yml"
+
+- import_playbook: "{{ playbook_dir }}/bootstrap_aws_infrastructure.yml"
+
+- import_playbook: "{{ playbook_dir }}/install_openshift.yml"

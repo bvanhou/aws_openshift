@@ -1,0 +1,97 @@
+---
+- hosts: localhost
+  tasks:
+  - name: Ensure new_app_capacity variable is set
+    fail:
+      msg: "You must specify the desired app node autoscaling group capacity via the ansible -e flag (e.g. -e new_app_capacity=5)."
+    when: new_app_capacity is undefined
+
+  - name: Get autoscaling group information
+    command: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg"
+    changed_when: false
+    register: asg_current
+
+  - name: Decrease autoscaling group min size if necessary
+    command: "aws autoscaling update-auto-scaling-group --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg --min-size {{ new_app_capacity }}"
+    when: (asg_current.stdout | from_json).AutoScalingGroups[0].MinSize | int > new_app_capacity | int
+
+  - name: Set new desired autoscaling group capacity
+    command: "aws autoscaling set-desired-capacity --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg --desired-capacity {{ new_app_capacity }}"
+    when: ((asg_current.stdout | from_json).AutoScalingGroups[0].DesiredCapacity | int) - (new_app_capacity | int) > 0
+
+  - name: Wait until expected number of hosts are pending termination
+    vars:
+      terminating_nodes: "{{ ((asg_current.stdout | from_json).AutoScalingGroups[0].Instances | length | int - new_app_capacity | int) }}"
+    command: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg"
+    changed_when: false
+    register: asg_next
+    until: "(asg_next.stdout | from_json).AutoScalingGroups[0].Instances | selectattr('LifecycleState', 'search', 'Terminating:Wait') | list | length == terminating_nodes | int"
+    retries: 100
+    delay: 10
+
+- name: Cordon, drain, and delete nodes
+  hosts: masters[0]
+  become: true
+  vars:
+    instance_ids: "{{ (hostvars.localhost.asg_next.stdout | from_json).AutoScalingGroups[0].Instances | selectattr('LifecycleState', 'search', 'Terminating:Wait') | map(attribute='InstanceId') | list }}"
+    instance_names: "{{ instance_ids | map('extract', groups) | map('first') | map('extract', hostvars, 'ec2_private_dns_name') | list | regex_replace('ec2.internal', host_suffix) }}"
+  tasks:
+  - name: Get list of configured cluster nodes
+    shell: oc get nodes --no-headers | awk '{ print $1 }'
+    register: oc_get_nodes
+    changed_when: false
+
+  - name: Cordon nodes
+    command: "oc adm cordon {{ item }}"
+    with_items: "{{ instance_names | intersect(oc_get_nodes.stdout_lines) }}"
+
+  - name: Drain nodes
+    command: "oc adm drain --delete-local-data --force=true --grace-period=30 --timeout 120s {{ item }}"
+    with_items: "{{ instance_names | intersect(oc_get_nodes.stdout_lines) }}"
+
+  - name: Remove nodes from cluster
+    command: "oc delete node {{ item }}"
+    with_items: "{{ instance_names | intersect(oc_get_nodes.stdout_lines) }}"
+
+- name: Cleanup
+  hosts: localhost
+  gather_facts: true
+  tasks:
+  - name: Allow autoscaling group to proceed terminating instances
+    vars:
+      instance_ids: "{{ (asg_next.stdout | from_json).AutoScalingGroups[0].Instances | selectattr('LifecycleState', 'search', 'Terminating:Wait') | map(attribute='InstanceId') | list }}"
+    command: "aws autoscaling complete-lifecycle-action --lifecycle-hook-name {{ cluster_id }}-{{ asg_name }}-app-node-asg-lh --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg --lifecycle-action-result CONTINUE --instance-id {{ item }}"
+    with_items: "{{ instance_ids }}"
+
+  - name: Ensure all instances are properly removed from autoscaling group
+    command: "aws autoscaling describe-auto-scaling-groups --auto-scaling-group-name {{ cluster_id }}-{{ asg_name }}-app-node-asg"
+    changed_when: false
+    register: asg_next
+    until: "('Terminating' not in (asg_next.stdout | from_json).AutoScalingGroups[0].Instances | map(attribute='LifecycleState') | list) and ((asg_next.stdout | from_json).AutoScalingGroups[0].Instances | length == new_app_capacity | int)"
+    retries: 100
+    delay: 10
+
+  - name: Refresh dynamic inventory
+    meta: refresh_inventory
+
+  - name: Regenerate ssh configurations
+    vars:
+      app_group: "{{ 'tag_Name_' + cluster_id | regex_replace('-', '_') + '_app_node_asg' }}"
+      app_ips: "{{ groups.get(app_group, []) }}"
+      local_path: "{{ user_local_path }}"
+      home_dir: "{{ user_local_home }}"
+    import_role:
+      name: ssh_config
+
+  - name: Ensure inventory directory exists
+    file:
+      path: "{{ user_local_path }}/inventory"
+      state: directory
+
+  - name: Regenerate OpenShift Ansible inventory file
+    vars:
+      new_nodes: []
+    template:
+      src: "../../templates/hosts.j2"
+      dest: "{{ user_local_path }}/inventory/{{ cluster_id }}-hosts"
+      backup: yes

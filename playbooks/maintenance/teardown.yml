@@ -1,0 +1,135 @@
+---
+- hosts: localhost
+  gather_facts: true
+  tasks:
+  - name: Remove cluster ips from known_hosts
+    known_hosts:
+      name: "{{ item }}"
+      state: absent
+    ignore_errors: true
+    with_items: "{{ bastion_ips + master_ips + infra_ips + app_ips }}"
+
+  - name: Remove cluster hostnames from known_hosts
+    known_hosts:
+      name: "{{ hostvars[item].ec2_private_dns_name | regex_replace('ec2.internal', host_suffix) }}"
+      state: absent
+    ignore_errors: true
+    with_items: "{{ bastion_ips + master_ips + infra_ips + app_ips }}"
+
+  - name: Teardown EC2 cloudformation stacks asyncronously
+    block:
+    - name: Teardown compute cloudformation stacks
+      cloudformation:
+        stack_name: "{{ cluster_id }}-{{ item.name }}-ocp-compute"
+        state: absent
+        region: "{{ region }}"
+      with_items: "{{ app_asgs }}"
+      register: compute_cfn
+      async: 7200
+      poll: 0
+
+    - name: Teardown control plane and bastion cloudformation stacks
+      cloudformation:
+        stack_name: "{{ item }}"
+        state: absent
+        region: "{{ region }}"
+      with_items:
+      - "{{ cluster_id }}-ocp-control-plane"
+      - "{{ cluster_id }}-ocp-bastion"
+      register: control_bastion_cfn
+      async: 7200
+      poll: 0
+
+    - name: Wait for async compute/control teardown to complete (This will take a while)
+      async_status:
+        jid: "{{ item.ansible_job_id }}"
+      register: cfn_jobs
+      until: cfn_jobs.finished
+      retries: 200
+      delay: 10
+      with_items: "{{ compute_cfn.results + control_bastion_cfn.results }}"
+
+  - name: Teardown infrastructure cloudformation stacks
+    cloudformation:
+      stack_name: "{{ item }}"
+      state: absent
+      region: "{{ region }}"
+    with_items:
+    - "{{ cluster_id }}-ocp-nlb"
+    - "{{ cluster_id }}-ocp-sg"
+
+  - name: Remove files
+    file:
+      path: "{{ item }}"
+      state: absent
+    with_items:
+    - "{{ user_local_home }}/.ssh/{{ bastion_key_pair }}.pem"
+    - "{{ user_local_home }}/.ssh/{{ master_key_pair }}.pem"
+    - "{{ user_local_home }}/.ssh/{{ node_key_pair }}.pem"
+
+  - name: Delete keypairs
+    ec2_key:
+      name: "{{ item }}"
+      state: absent
+      region: "{{ region }}"
+    with_items:
+    - "{{ bastion_key_pair }}"
+    - "{{ master_key_pair }}"
+    - "{{ node_key_pair }}"
+
+  - name: Get log files
+    find:
+      paths: "../../ansible"
+      patterns: "*.log"
+    register: logs_to_delete
+
+  - name: Remove log files
+    file:
+      path: "{{ item.path }}"
+      state: absent
+    with_items: "{{ logs_to_delete.files }}"
+
+  - name: Get retry files
+    find:
+      paths: "../"
+      patterns: "*.retry"
+    register: retrys_to_delete
+
+  - name: Remove retry files
+    file:
+      path: "{{ item.path }}"
+      state: absent
+    with_items: "{{ retrys_to_delete.files }}"
+
+  - name: Remove local ssh config
+    blockinfile:
+      path: "{{ user_local_home }}/.ssh/config"
+      block: "{{ lookup('file', user_local_path + '/ssh.cfg') }}"
+      state: absent
+    ignore_errors: true
+
+  - name: Get user local ssh configuration for this cluster
+    find:
+      paths: "{{ user_local_path }}/ssh_config"
+      patterns: "{{ cluster_id }}-*.cfg"
+    register: ssh_configs_to_delete
+
+  - name: Remove user local ssh configuration
+    file:
+      path: "{{ item.path }}"
+      state: absent
+    with_items: "{{ ssh_configs_to_delete.files }}"
+
+  - name: Assemble aggregated user local ssh.cfg from remaining configurations
+    assemble:
+      src: "{{ user_local_path }}/ssh_config"
+      dest: "{{ user_local_path }}/ssh.cfg"
+      delimiter: "##%!* Start SSH config *!%##"
+
+  - name: Update local ssh config
+    blockinfile:
+      insertbefore: BOF
+      create: yes
+      mode: 0644
+      path: "{{ user_local_home }}/.ssh/config"
+      block: "{{ lookup('file', user_local_path + '/ssh.cfg') }}"

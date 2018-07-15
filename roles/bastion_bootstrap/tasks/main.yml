@@ -1,0 +1,38 @@
+- name: Copy ip generation script
+  copy:
+    src: files/cidr-to-ip.sh
+    dest: "{{ user_remote_home }}/cidr-to-ip.sh"
+    mode: 0744
+
+- name: Generate ip from cidr
+  command: "{{ user_remote_home }}/cidr-to-ip.sh {{ subnet_cidr }}"
+  changed_when: no
+  register: cidr_ip_list
+
+- name: Create dnsmasq configuration
+  template:
+    src: templates/dnsmasq.ocp.conf.j2
+    dest: /etc/dnsmasq.d/ocp.conf
+  notify:
+  - Restart dnsmasq
+
+- name: Set self as DNS server
+  shell: "nmcli con mod 'System eth0' ipv4.ignore-auto-dns yes ipv4.dns 127.0.0.1 ipv4.dns-search {{ host_suffix }}"
+  notify:
+  - Restart NetworkManager
+
+- name: Modify resolv.conf to use self as DNS
+  lineinfile:
+    path: /etc/resolv.conf
+    regexp: '^nameserver.*'
+    line: 'nameserver 127.0.0.1'
+    state: present
+    backup: yes
+
+- name: Modify resolv.conf to use host_suffix
+  lineinfile:
+    path: /etc/resolv.conf
+    regexp: '^search.*'
+    line: "search *.{{ host_suffix }}"
+    state: present
+    backup: yes

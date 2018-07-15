@@ -1,0 +1,10 @@
+---
+- name: Restart NetworkManager
+  systemd:
+    name: NetworkManager
+    state: restarted
+
+- name: Restart dnsmasq
+  systemd:
+    name: dnsmasq
+    state: restarted

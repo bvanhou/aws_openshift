@@ -1,0 +1,6 @@
+# Upstream
+server={{ bastion_ips[0] }}
+
+# Avoid AWS NLB's hairpinning by using host IP for all API requests
+host-record={{ openshift_master_cluster_public_hostname }},{{ ansible_default_ipv4.address }}
+host-record={{ openshift_master_cluster_hostname }},{{ ansible_default_ipv4.address }}

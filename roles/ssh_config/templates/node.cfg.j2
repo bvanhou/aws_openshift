@@ -1,0 +1,14 @@
+Host {{ ssh_shortname }} {{ dns_name }} {{ private_ip }}
+    Hostname {{ private_ip }}
+    IdentityFile {{ home_dir }}/.ssh/{{ ssh_key_name }}.pem
+    PasswordAuthentication no
+    PreferredAuthentications publickey
+{% if bastion_proxy %}
+{% if publicly_accessible %}
+    ProxyCommand ssh {{ bastion_public_ip }} -W %h:%p
+{% else %}
+    ProxyCommand ssh {{ bastion_private_ip }} -W %h:%p
+{% endif %}
+{% endif %}
+    StrictHostKeyChecking no
+    User ec2-user

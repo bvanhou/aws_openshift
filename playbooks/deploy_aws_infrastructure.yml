@@ -1,0 +1,214 @@
+---
+- import_playbook: "{{ playbook_dir }}/maintenance/prerequisites.yml"
+
+- name: Prep workstation for cluster deployment
+  hosts: localhost
+  gather_facts: true
+  tasks:
+  - name: Update region in inventory file
+    lineinfile:
+      path: ../inventory/ec2.ini
+      regexp: '^regions ='
+      state: present
+      line: 'regions = {{ region }}'
+
+  - name: Generate EC2 keypairs if necessary
+    block:
+    - name: Ensure .ssh directory exists
+      file:
+        state: directory
+        path: "{{ user_local_home }}/.ssh"
+
+    - name: Create Bastion EC2 Keypair
+      ec2_key:
+        name: "{{ bastion_key_pair }}"
+        state: present
+        region: "{{ region }}"
+      register: bastion_ec2_key
+
+    - name: Create Bastion private key file locally
+      copy:
+        content: "{{ bastion_ec2_key.key.private_key }}"
+        dest: "{{ user_local_home }}/.ssh/{{ bastion_key_pair }}.pem"
+        mode: 0600
+      when: bastion_ec2_key.changed
+
+    - name: Create OpenShift Master EC2 Keypair
+      ec2_key:
+        name: "{{ master_key_pair }}"
+        state: present
+        region: "{{ region }}"
+      register: master_ec2_key
+
+    - name: Create OpenShift master private key file locally
+      copy:
+        content: "{{ master_ec2_key.key.private_key }}"
+        dest: "{{ user_local_home }}/.ssh/{{ master_key_pair }}.pem"
+        mode: 0600
+      when: master_ec2_key.changed
+
+    - name: Create OpenShift Node EC2 Keypair
+      ec2_key:
+        name: "{{ node_key_pair }}"
+        state: present
+        region: "{{ region }}"
+      register: node_ec2_key
+
+    - name: Create OpenShift node private key file locally
+      copy:
+        content: "{{ node_ec2_key.key.private_key }}"
+        dest: "{{ user_local_home }}/.ssh/{{ node_key_pair }}.pem"
+        mode: 0600
+      when: node_ec2_key.changed
+    when: key_pair_generation
+
+- name: Deploy CloudFormation stacks
+  hosts: localhost
+  tasks:
+  - name: Get Master API NLB information from AWS
+    command: "aws elbv2 describe-load-balancers --names {{ api_nlb_name }}"
+    changed_when: false
+    register: master_api_nlb
+
+  - name: Get HAProxy NLB information from AWS
+    command: "aws elbv2 describe-load-balancers --names {{ app_nlb_name }}"
+    changed_when: false
+    register: infra_haproxy_nlb
+
+  - name: Deploy security group CloudFormation stack
+    cloudformation:
+      stack_name: "{{ cluster_id }}-ocp-sg"
+      state: "present"
+      region: "{{ region }}"
+      disable_rollback: true
+      template: ../cfn-templates/security_groups.yml
+      template_parameters:
+        ClusterID: "{{ cluster_id }}"
+        VpcID: "{{ vpc_id }}"
+        AZ: "{{ availability_zone }}"
+        MasterAPIPort: "{{ api_port }}"
+      tags:
+        Stack: "{{ cluster_id }}-ocp-sg"
+        ClusterID: "{{ cluster_id }}"
+
+  - name: Deploy nlb CloudFormation stack
+    cloudformation:
+      stack_name: "{{ cluster_id }}-ocp-nlb"
+      state: "present"
+      region: "{{ region }}"
+      disable_rollback: true
+      template: ../cfn-templates/nlb_config.yml
+      template_parameters:
+        ClusterID: "{{ cluster_id }}"
+        VpcID: "{{ vpc_id }}"
+        AZ: "{{ availability_zone }}"
+        MasterAPINLBARN: "{{ (master_api_nlb.stdout | from_json).LoadBalancers[0].LoadBalancerArn }}"
+        InfraHAProxyNLBARN: "{{ (infra_haproxy_nlb.stdout | from_json).LoadBalancers[0].LoadBalancerArn }}"
+        MasterAPIPort: "{{ api_port }}"
+      tags:
+        Stack: "{{ cluster_id }}-ocp-nlb"
+        ClusterID: "{{ cluster_id }}"
+
+  - name: Deploy bastion CloudFormation stack
+    cloudformation:
+      stack_name: "{{ cluster_id }}-ocp-bastion"
+      state: "present"
+      region: "{{ region }}"
+      disable_rollback: true
+      template: ../cfn-templates/bastion.yml
+      template_parameters:
+        ClusterID: "{{ cluster_id }}"
+        VpcID: "{{ vpc_id }}"
+        SubnetID:  "{{ (master_api_nlb.stdout | from_json).LoadBalancers[0].AvailabilityZones[0].SubnetId }}"
+        AZ: "{{ availability_zone }}"
+        AMIId: "{{ ami_id }}"
+        BastionNodeInstanceType: "{{ bastion_instance_type }}"
+        BastionNodeKeyPairName: "{{ bastion_key_pair }}"
+        PubliclyAccessible: "{{ publicly_accessible | lower | default(false)| string }}"
+      tags:
+        Stack: "{{ cluster_id }}-ocp-bastion"
+        ClusterID: "{{ cluster_id }}"
+
+  - name: Deploy cluster CloudFormation stack
+    cloudformation:
+      stack_name: "{{ cluster_id }}-ocp-control-plane"
+      state: "present"
+      region: "{{ region }}"
+      disable_rollback: true
+      template: ../cfn-templates/control_plane.yml
+      template_parameters:
+        ClusterID: "{{ cluster_id }}"
+        VpcID: "{{ vpc_id }}"
+        SubnetID: "{{ (master_api_nlb.stdout | from_json).LoadBalancers[0].AvailabilityZones[0].SubnetId }}"
+        AZ: "{{ availability_zone }}"
+        AMIId: "{{ ami_id }}"
+        MasterNodeDesiredCapacity: "{{ master_capacity }}"
+        MasterNodeInstanceType: "{{ master_instance_type }}"
+        MasterNodeMaxFleetSize: "{{ master_capacity }}"
+        MasterNodeMinFleetSize: "{{ master_capacity }}"
+        MasterNodeOSVolumeSize: "{{ master_os_volume_size }}"
+        MasterNodeExtraVolumeSize: "{{ master_extra_volume_size }}"
+        MasterNodeKeyPairName: "{{ master_key_pair }}"
+        InfraNodeDesiredCapacity: "{{ infra_capacity }}"
+        InfraNodeInstanceType: "{{ infra_instance_type }}"
+        InfraNodeMaxFleetSize: "{{ infra_capacity }}"
+        InfraNodeMinFleetSize: "{{ infra_capacity }}"
+        InfraNodeOSVolumeSize: "{{ infra_os_volume_size }}"
+        InfraNodeExtraVolumeSize: "{{ infra_extra_volume_size }}"
+        InfraNodeKeyPairName: "{{ node_key_pair }}"
+        PubliclyAccessible: "{{ publicly_accessible | lower | default(false)| string }}"
+      tags:
+        Stack: "{{ cluster_id }}-ocp-control-plane"
+        ClusterID: "{{ cluster_id }}"
+
+  - name: Deploy compute CloudFormation stacks
+    cloudformation:
+      stack_name: "{{ cluster_id }}-{{ item.name }}-ocp-compute"
+      state: "present"
+      region: "{{ region }}"
+      disable_rollback: true
+      template: ../cfn-templates/compute.yml
+      template_parameters:
+        ClusterID: "{{ cluster_id }}"
+        VpcID: "{{ vpc_id }}"
+        SubnetID: "{{ (master_api_nlb.stdout | from_json).LoadBalancers[0].AvailabilityZones[0].SubnetId }}"
+        AZ: "{{ availability_zone }}"
+        AMIId: "{{ ami_id }}"
+        AutoScalingGroupName: "{{ item.name }}"
+        AppNodeDesiredCapacity: "{{ item.capacity }}"
+        AppNodeInstanceType: "{{ item.instance_type }}"
+        AppNodeMaxFleetSize: "{{ item.capacity }}"
+        AppNodeMinFleetSize: "{{ item.capacity }}"
+        AppNodeOSVolumeSize: "{{ item.os_volume_size }}"
+        AppNodeExtraVolumeSize: "{{ item.extra_volume_size }}"
+        AppNodeKeyPairName: "{{ node_key_pair }}"
+        PubliclyAccessible: "{{ publicly_accessible | lower | default(false)| string }}"
+      tags:
+        Stack: "{{ cluster_id }}-{{ item.name }}-ocp-compute"
+        ClusterID: "{{ cluster_id }}"
+    with_items: "{{ app_asgs }}"
+
+  - name: Refresh dynamic inventory
+    meta: refresh_inventory
+
+  - name: Generate ssh configurations
+    vars:
+      home_dir: "{{ user_local_home }}"
+      local_path: "{{ user_local_path }}"
+    import_role:
+      name: ssh_config
+
+  - name: Create certificates directory
+    file:
+      state: directory
+      path: "{{ user_local_path }}/certificates/"
+
+  - name: Fetch certificates for cluster infrastructure
+    copy:
+      src: /etc/pki/ca-trust/source/anchors/
+      dest: "{{ user_local_path }}/certificates/"
+
+  - name: Remove CA from certificates directory
+    file:
+      path: "{{ user_local_path }}/certificates/ca.crt"
+      state: absent

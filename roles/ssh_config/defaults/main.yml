@@ -1,0 +1,35 @@
+# List of private IP addresses for bastion hosts
+bastion_ips: []
+
+# List of private IP addresses for master hosts
+master_ips: []
+
+# List of private IP addresses for infra hosts
+infra_ips: []
+
+# List of private IP addresses for app hosts
+app_ips: []
+
+# Unique cluster label (dev, prod, mine, etc). Must be unique per AZ, contain no special characters, and have 8 char max
+cluster_id: ''
+
+# User-scoped path for files used during cluster administration
+user_local_path: ''
+
+# Whether or not the nodes have public ip addresses
+publicly_accessible: false
+
+# AWS availability zone
+availabilty_zone: 'us-east-1a'
+
+# DNS host suffix
+host_suffix: 'ec2.internal'
+
+# Home directory
+home_dir: ''
+
+# User scoped local directory
+local_path: ''
+
+# Whether the configuration should proxy through the bastion or not
+bastion_proxy: true

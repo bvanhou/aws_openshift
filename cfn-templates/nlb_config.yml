@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: OpenShift NLB configuration
+
+Parameters:
+
+  ClusterID:
+    Type: String
+    Description: Unique value identifying this OpenShift environment
+
+  VpcID:
+    Type: 'AWS::EC2::VPC::Id'
+    Description: ID of the VPC to deploy EC2 instance into
+
+  AZ:
+    Type: String
+    Description: Availability Zone
+    Default: us-east-1a
+
+  MasterAPINLBARN:
+    Type: String
+    Description: ARN of the Master API NLB
+
+  InfraHAProxyNLBARN:
+    Type: String
+    Description: ARN of the HAProxy NLB
+
+  MasterAPIPort:
+    Type: String
+    Description: Port for API traffic
+
+Resources:
+
+  InfraHAProxyNLBListenerHTTPS:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref InfraHAProxyNLBTargetGroupHTTPS
+      LoadBalancerArn: !Ref InfraHAProxyNLBARN
+      Port: 443
+      Protocol: TCP
+
+  InfraHAProxyNLBTargetGroupHTTPS:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name: !Join [ '', [ !Ref ClusterID, '-i-tg-tls' ] ]
+      Port: 443
+      Protocol: TCP
+      VpcId: !Ref VpcID
+
+  InfraHAProxyNLBListenerHTTP:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref InfraHAProxyNLBTargetGroupHTTP
+      LoadBalancerArn: !Ref InfraHAProxyNLBARN
+      Port: 80
+      Protocol: TCP
+
+  InfraHAProxyNLBTargetGroupHTTP:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name: !Join [ '', [ !Ref ClusterID, '-i-tg-80' ] ]
+      Port: 80
+      Protocol: TCP
+      VpcId: !Ref VpcID
+
+  MasterNodeNLBListenerHTTPS:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref MasterNodeNLBTargetGroupHTTPS
+      LoadBalancerArn: !Ref MasterAPINLBARN
+      Port: !Ref MasterAPIPort
+      Protocol: TCP
+
+  MasterNodeNLBListenerHTTP:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    Properties:
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn: !Ref MasterNodeNLBTargetGroupHTTPS
+      LoadBalancerArn: !Ref MasterAPINLBARN
+      Port: 80 # This is used to redirect 80 -> 443
+      Protocol: TCP
+
+  MasterNodeNLBTargetGroupHTTPS:
+    Type: 'AWS::ElasticLoadBalancingV2::TargetGroup'
+    Properties:
+      HealthCheckIntervalSeconds: 30
+      UnhealthyThresholdCount: 2
+      HealthyThresholdCount: 2
+      Name: !Join [ '', [ !Ref ClusterID, '-m-tg-tls' ] ]
+      Port: !Ref MasterAPIPort
+      Protocol: TCP
+      VpcId: !Ref VpcID
+
+Outputs:
+
+  MasterNodeNLBTargetGroupHTTPS:
+    Description: Master API NLB target group
+    Value: !Ref MasterNodeNLBTargetGroupHTTPS
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-m-tg-tls' ] ]
+
+  InfraHAProxyNLBTargetGroupHTTPS:
+    Description: Infra HAProxy NLB target group https
+    Value: !Ref InfraHAProxyNLBTargetGroupHTTPS
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-i-tg-tls' ] ]
+
+  InfraHAProxyNLBTargetGroupHTTP:
+    Description: Infra HAProxy NLB target group http
+    Value: !Ref InfraHAProxyNLBTargetGroupHTTP
+    Export:
+      Name: !Join [ '', [ !Ref ClusterID, '-i-tg-80' ] ]

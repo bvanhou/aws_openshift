@@ -1,0 +1,20 @@
+# Don't use /etc/hosts
+no-hosts
+
+# Don't use /etc/resolv.conf
+no-resolv
+
+# Upstream DNS
+server={{ upstream_dns }}
+
+# Master API LBs
+host-record={{ openshift_master_cluster_public_hostname }},{{ master_api_nlb_ip }}
+host-record={{ openshift_master_cluster_hostname }},{{ master_api_nlb_ip }}
+
+# HAProxy Wildcard
+address=/{{ openshift_master_default_subdomain }}/{{ infra_haproxy_nlb_ip }}
+
+# Subnet DNS records
+{% for ip in cidr_ip_list.stdout_lines %}
+host-record=ip-{{ ip.split('.')[0] }}-{{ ip.split('.')[1] }}-{{ ip.split('.')[2] }}-{{ ip.split('.')[3] }}.{{ host_suffix }},{{ ip }}
+{% endfor %}

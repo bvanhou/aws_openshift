@@ -1,0 +1,87 @@
+---
+- name: Verify prerequisites are met
+  hosts: localhost
+  vars:
+    required_vars:
+    - cluster_id
+    - region
+    - availability_zone
+    - vpc_id
+    - api_nlb_name
+    - app_nlb_name
+    - master_instance_type
+    - infra_instance_type
+    - openshift_master_default_subdomain
+    - openshift_master_cluster_hostname
+    - openshift_master_cluster_public_hostname
+    - yum_repos
+    - enable_cloudprovider
+    - openshift_docker_additional_registries
+    - openshift_docker_blocked_registries
+    - oreg_url
+    - openshift_examples_modify_imagestreams
+    required_utils:
+    - aws
+    - host
+    required_python_modules:
+    - boto
+    - boto3
+    - botocore
+    - yaml
+  tasks:
+  - name: Ensure expected ansible version is installed
+    assert:
+      that: "ansible_version.full | version_compare('2.4', '>=')"
+      msg: "You need Ansible version 2.4.0+"
+
+  - name: Validate that openshift rpms are installed
+    stat:
+      path: /usr/share/ansible/openshift-ansible
+    changed_when: false
+    register: openshift_directory
+
+  - name: Fail if directory doesn't exist
+    fail:
+      msg: "The directory of /usr/share/ansible/ must contain OpenShift playbooks and roles which can be installed by rpm or git clone"
+    when: openshift_directory.stat.exists == False
+
+  - name: Ensure required variables have been set
+    fail:
+      msg: "Required variable '{{ item }}' is not defined. Have you passing in config.yml appropriately?"
+    when: item not in hostvars[inventory_hostname]
+    with_items: "{{ required_vars }}"
+
+  - name: Check required utils
+    command: "which {{ item }}"
+    register: util_present
+    changed_when: false
+    ignore_errors: true
+    with_items: "{{ required_utils }}"
+
+  - name: Ensure required utils exist
+    fail:
+      msg: Missing required command line utilities
+    when: item.rc != 0
+    with_items: "{{ util_present.results }}"
+
+  - name: Ensure requried python modules are installed
+    command: "python -c 'import {{ item }}'"
+    register: python_imports
+    changed_when: false
+    with_items: "{{ required_python_modules }}"
+
+  - name: Fail if python module is missing
+    fail:
+      msg: "You are missing a required Python module"
+    when: item.rc != 0
+    with_items: "{{ python_imports.results }}"
+
+  - name: Get NLB information
+    command: "aws elbv2 describe-load-balancers --names '{{ api_nlb_name }}' '{{ app_nlb_name }}'"
+    register: nlb_resp
+    changed_when: false
+
+  - name: Ensure NLBs exist
+    assert:
+      that: nlb_resp.rc == 0
+      msg: "The NLBs {{ api_nlb_name }} and {{ app_nlb_name }} were not configured appropriately or do not exist"

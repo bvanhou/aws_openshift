@@ -1,0 +1,103 @@
+---
+- hosts: localhost
+  tasks:
+  - name: Test connectivity to Master API
+    uri:
+      url: "https://{{ openshift_master_cluster_public_hostname }}:{{ api_port }}/api/v1"
+      return_content: yes
+      validate_certs: no
+    register: master_resp
+    changed_when: false
+
+  - fail:
+      msg: "There was a problem communicating with the API for cluster {{ openshift_master_cluster_public_hostname }}"
+    when: master_resp.status != 200
+
+  - name: Test connectivity to HAProxy - this is expected to return a 503 and "fail"
+    uri:
+      url: "https://test.{{ openshift_master_default_subdomain }}"
+      return_content: yes
+      validate_certs: no
+    register: haproxy_resp
+    changed_when: false
+    ignore_errors: yes
+
+  - fail:
+      msg: "There was a problem communicating with the API for cluster {{ openshift_master_cluster_public_hostname }}"
+    when: haproxy_resp.status != 503 and 'Route and path matches, but all pods are down' not in haproxy_resp.content
+
+- hosts: masters[0]
+  become: yes
+  tasks:
+  - name: Get list of configured cluster nodes
+    shell: oc get nodes --no-headers | awk '{ print $1 }'
+    register: oc_get_nodes
+    changed_when: false
+
+  - name: Ensure all nodes have been properly added to cluster
+    fail:
+      msg: "Cluster node {{ item }} was not configured properly"
+    when: item not in oc_get_nodes.stdout_lines
+    with_items: "{{ groups['nodes'] }}"
+
+  - name: Run oc adm diagnostics
+    command: oc adm diagnostics -l 4 AnalyzeLogs ClusterRoleBindings ClusterRoles ClusterRouter ConfigContexts EtcdWriteVolume MasterConfigCheck NodeConfigCheck NodeDefinitions UnitStatus
+    register: oc_adm_diagnostics
+    changed_when: false
+
+  - fail:
+      msg: "oc adm diagnostics encountered an error with cluster {{ openshift_master_cluster_public_hostname }}"
+    when: oc_adm_diagnostics.rc != 0
+
+- hosts: masters
+  become: yes
+  tasks:
+  - name: Check logical volume group is created
+    shell: "vgs --readonly --noheadings {{ volume_group_name }}"
+    changed_when: false
+    register: volume_groups
+
+  - name: Fail if it was not
+    fail:
+      msg: "Volume group not created properly"
+    when: volume_groups.rc != 0
+
+- hosts: infra
+  become: yes
+  tasks:
+  - name: Check logical volume group is created
+    shell: "vgs --readonly --noheadings {{ volume_group_name }}"
+    changed_when: false
+    register: volume_groups
+
+  - name: Fail if it was not
+    fail:
+      msg: "Volume group not created properly"
+    when: volume_groups.rc != 0
+
+- hosts: app
+  become: yes
+  tasks:
+  - name: Check logical volume group is created
+    shell: "vgs --readonly --noheadings {{ volume_group_name }}"
+    changed_when: false
+    register: volume_groups
+
+  - name: Fail if it was not
+    fail:
+      msg: "Volume group not created properly"
+    when: volume_groups.rc != 0
+
+- hosts: masters:infra:app
+  become: yes
+  tasks:
+  - name: Check docker storage configuration
+    shell: docker info | grep -q overlay
+    ignore_errors: yes
+    changed_when: false
+    register: docker_storage
+
+  - name: Fail if docker storage isn't configured properly
+    fail:
+      msg: "Container storage setup was not run properly"
+    when: docker_storage.rc != 0

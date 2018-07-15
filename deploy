@@ -1,0 +1,342 @@
+#!/usr/bin/python -u
+
+import argparse
+import os
+import sys
+import boto3
+from botocore.config import Config
+from botocore.exceptions import ClientError
+from jinja2 import FileSystemLoader, Environment
+import yaml
+from ansible.parsing.dataloader import DataLoader
+from ansible.inventory.manager import InventoryManager
+
+parser = argparse.ArgumentParser(description='Command line tool for administering AWS OpenShift clusters')
+parser.add_argument('type', type=str, choices=['config', 'install', 'scale', 'health', 'teardown', 'ami', 'info'], help='Deploy type')
+parser.add_argument('-t', '--template', type=str, help='Path to cluster configuration template (e.g. /home/user/cluster_configuration.yml.j2)')
+parser.add_argument('-c', '--config', type=str, help='Path to configuration file')
+parser.add_argument('-e', '--environment', type=str, help='Environment the cluster belongs to (e.g. sandbox)')
+parser.add_argument('-n', '--number', type=int, help='Cardinal number of cluster in its environment (e.g. 03)')
+parser.add_argument('-z', '--az', type=str, help='AWS availability zone (e.g. us-east-1a)')
+parser.add_argument('-m', '--api_nlb', type=str, help='OpenShift API NLB name (e.g. sandbox-nlb-1-818f-api)')
+parser.add_argument('-a', '--app_nlb', type=str, help='OpenShift Application NLB name (e.g. sandbox-nlb-1-818f-app)')
+parser.add_argument('-s', '--cluster_size', type=str, help='Cluster size template to use for infrastructure (e.g. large)')
+parser.add_argument('-d', '--desired_nodes', type=int, help='Desired number of application nodes (Max 100 new nodes per asg_name) (e.g. 9)')
+parser.add_argument('-g', '--asg_name', type=str, help='Auto scaling group name to scale (Found in sizing-template or cluster configuration file) (e.g. base)')
+parser.add_argument('-o', '--hosts_file', type=str, help='Absolute path to OpenShift hosts file (e.g. /home/user/etc/ansible/inventory/sandbox02-hosts)')
+parser.add_argument('-l', '--list_clusters', action='store_true', help='List information about deployed clusters')
+parser.add_argument('-f', '--force', action='store_true', help='Ignore any prompts and proceed')
+parser.add_argument("-v", "--verbosity", action="count", help='Increase output verbosity (Can specify multiple - i.e. -vvv)')
+args = parser.parse_args()
+
+
+def check_flags(required_flags, type, args):
+    """Ensures required flags are set for a given type
+
+    :param required_flags: Flags to check
+    :type required_flags: list
+    :param type: Deployment type passed in via command line
+    :type type: str
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+    for flag in required_flags:
+        if getattr(args, flag) is None:
+            print 'You must supply the --%s flag with deployment type "%s"' % (flag, type)
+            exit(1)
+
+
+def parse_yaml(file_path):
+    """Load yaml from file
+
+    :param file_path: Path to YAML file
+    :type file_path: str
+    :return: Dictionary containing YAML file contents
+    :rtype: dict
+    """
+    # Ensure file exists
+    if not os.path.isfile(file_path):
+        print 'Could not find file "%s"' % file_path
+        exit(1)
+
+    # Parse file
+    with open(file_path, 'r') as f:
+        try:
+            contents = yaml.load(f)
+        except yaml.YAMLError as e:
+            print 'There was a problem parsing the yaml file\n', e
+            exit(1)
+
+    return contents
+
+
+def parse_inventory_groups(file_path):
+    """Load ansible inventory file and return a dict containing the groups
+
+    :param file_path: Path to OpenShift Ansible hosts file
+    :type file_path: str
+    :return: Dictionary containing host groups from OpenShift Ansible hosts file
+    :rtype: dict
+    """
+    if not os.path.isfile(file_path):
+        print 'Could not find inventory file "%s"' % file_path
+        exit(1)
+
+    loader = DataLoader()
+    inventory = InventoryManager(loader=loader, sources=file_path)
+
+    return inventory.get_groups_dict()
+
+
+def check_stack(cluster_id):
+    """Checks if a CloudFormation stack already exists associated with a given cluster id and prompts to proceed if it does
+
+    :param cluster_id: Unique cluster id
+    :type cluster_id: str
+    """
+    boto_config = Config(retries={'max_attempts': 10})
+    cloudformation = boto3.client('cloudformation', config=boto_config)
+
+    try:
+        cloudformation.describe_stacks(StackName='%s-ocp-sg' % cluster_id)
+    except ClientError as e:
+        if e.response['Error']['Code'] != 'ValidationError' and not args.force:
+            print 'It looks like cluster %s may already be deployed, do you want to proceed anyway?' % cluster_id
+            while True:
+                proceed = raw_input('(y/n): ')
+                if proceed == 'y':
+                    break
+                elif proceed == 'n':
+                    exit(0)
+                else:
+                    print 'Please input y/n'
+
+
+def config(args):
+    """Generate cluster configuration for subsequent deployment types
+
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+    check_flags(['environment', 'number', 'az', 'api_nlb', 'app_nlb', 'cluster_size', 'template'], 'config', args)
+
+    # Capture our current directory
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    # Ensure sizing template exists
+    if not os.path.isfile(args.template):
+        print 'Could not find cluster template "%s"' % args.template
+        exit(1)
+
+    # Generate cluster configuration from template
+    j2_env = Environment(loader=FileSystemLoader(dir_path))
+    template = j2_env.get_template(args.template)
+    render = template.render(
+        cluster_environment=args.environment,
+        cluster_number='%02d' % args.number,
+        availability_zone=args.az,
+        api_nlb_name=args.api_nlb,
+        app_nlb_name=args.app_nlb
+    )
+
+    # Ensure sizing template exists
+    if not os.path.isfile("sizing-templates/%s.yml" % args.cluster_size):
+        print 'Could not find cluster sizing template for size "%s"' % args.cluster_size
+        exit(1)
+
+    # Write template and sizing config to cluster configuration
+    with open('%s%02d-config.yml' % (args.environment, args.number), 'w+')as c:
+        c.writelines(render)
+        c.writelines('\n')
+        with open("sizing-templates/%s.yml" % args.cluster_size, 'r') as s:
+            for line in s:
+                c.write(line)
+
+
+def install(args):
+    """Execute ansible playbooks to deploy AWS infrastructure and install OpenShift
+
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+    check_flags(['config'], 'install', args)
+
+    verbosity = '-' + 'v' * args.verbosity if args.verbosity > 0 else ''
+
+    cluster_config = parse_yaml(args.config)
+
+    check_stack('%s%02d' % (cluster_config['cluster_environment'], cluster_config['cluster_number']))
+
+    ansible_cmd = 'ansible-playbook %s playbooks/deploy_all.yml -e "@%s" -e "@defaults/main.yml"' % (verbosity, args.config)
+
+    print "\nExecuting the following ansible command:\n%s\n" % ansible_cmd
+    status = os.system(ansible_cmd)
+
+    # Exit appropriately
+    if os.WIFEXITED(status) and os.WEXITSTATUS(status) != 0:
+        sys.exit(os.WEXITSTATUS(status))
+
+
+def scale(args):
+    """Execute ansible playbooks to scale existing OpenShift cluster up/down
+
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+    check_flags(['desired_nodes', 'asg_name', 'hosts_file', 'config'], 'scale', args)
+
+    verbosity = '-' + 'v' * args.verbosity if args.verbosity > 0 else ''
+
+    cluster_groups = parse_inventory_groups(args.hosts_file)
+
+    if cluster_groups.get('app_'+args.asg_name, None) is None:
+        print 'It does not appear there is an auto scaling group with name "%s"' % args.asg_name
+        exit(1)
+
+    # Handle scale up
+    if int(cluster_groups['app_'+args.asg_name].__len__()) < int(args.desired_nodes):
+
+        ansible_cmd = 'ansible-playbook %s playbooks/scaling/scale_app_up.yml -i inventory -i %s -e "new_app_capacity=%s asg_name=%s" -e "@%s" -e "@defaults/main.yml"' \
+                       % (verbosity, args.hosts_file, args.desired_nodes, args.asg_name, args.config)
+
+        print "\nExecuting the following ansible command:\n%s\n" % ansible_cmd
+        status = os.system(ansible_cmd)
+
+    # Handle scale down
+    elif int(cluster_groups['app_'+args.asg_name].__len__()) > int(args.desired_nodes):
+
+        ansible_cmd = 'ansible-playbook %s playbooks/scaling/scale_app_down.yml -i inventory -i %s -e "new_app_capacity=%s asg_name=%s" -e "@%s" -e "@defaults/main.yml"' \
+                       % (verbosity, args.hosts_file, args.desired_nodes, args.asg_name, args.config)
+
+        print "\nExecuting the following ansible command:\n%s\n" % ansible_cmd
+        status = os.system(ansible_cmd)
+
+    else:
+        print "Cluster already contains desired number of application nodes"
+        exit(0)
+
+    # Exit appropriately
+    if os.WIFEXITED(status) and os.WEXITSTATUS(status) != 0:
+        sys.exit(os.WEXITSTATUS(status))
+
+
+def health(args):
+    """Execute ansible playbooks to run diagnostic checks against existing cluster
+
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+    check_flags(['hosts_file', 'config'], 'health', args)
+
+    verbosity = '-' + 'v' * args.verbosity if args.verbosity > 0 else ''
+
+    ansible_cmd = 'ansible-playbook %s playbooks/maintenance/diagnostics.yml -i inventory -i %s -e "@%s" -e "@defaults/main.yml"' \
+                  % (verbosity, args.hosts_file, args.config)
+
+    print "\nExecuting the following ansible command:\n%s\n" % ansible_cmd
+    status = os.system(ansible_cmd)
+
+    # Exit appropriately
+    if os.WIFEXITED(status) and os.WEXITSTATUS(status) != 0:
+        sys.exit(os.WEXITSTATUS(status))
+
+
+def teardown(args):
+    """Execute ansible playbooks to destroy existing OpenShift cluster
+
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+    check_flags(['config'], 'teardown', args)
+
+    verbosity = '-' + 'v' * args.verbosity if args.verbosity > 0 else ''
+
+    cluster_config = parse_yaml(args.config)
+
+    if not args.force:
+        print "You are attempting to teardown the following cluster\n%s%02d\nAre you certain this is correct? This action cannot be undone." % (cluster_config['cluster_environment'], cluster_config['cluster_number'])
+        while True:
+            proceed = raw_input('(y/n): ')
+            if proceed == 'y':
+                break
+            elif proceed == 'n':
+                exit(0)
+            else:
+                print 'Please input y/n'
+
+    ansible_cmd = 'ansible-playbook %s playbooks/maintenance/teardown.yml -e "@%s" -e "@defaults/main.yml"' % (verbosity, args.config)
+
+    print "\nExecuting the following ansible command:\n%s\n" % ansible_cmd
+    status = os.system(ansible_cmd)
+
+    # Exit appropriately
+    if os.WIFEXITED(status) and os.WEXITSTATUS(status) != 0:
+        sys.exit(os.WEXITSTATUS(status))
+
+
+def ami(args):
+    """Execute ansible playbooks to generate cluster AMI's
+
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+    check_flags(['config'], 'ami', args)
+
+    verbosity = '-' + 'v' * args.verbosity if args.verbosity > 0 else ''
+
+    ansible_cmd = 'ansible-playbook %s playbooks/maintenance/create_ami.yml -e "@%s"' % (verbosity, args.config)
+
+    print "\nExecuting the following ansible command:\n%s\n" % ansible_cmd
+    status = os.system(ansible_cmd)
+
+    # Exit appropriately
+    if os.WIFEXITED(status) and os.WEXITSTATUS(status) != 0:
+        sys.exit(os.WEXITSTATUS(status))
+
+
+def info(args):
+    """Print information about AWS environments
+
+    :param args: Command line arguments
+    :type args: argparse.Namespace
+    """
+
+    if args.list_clusters:
+        check_flags([], 'info', args)
+
+        boto_config = Config(retries={'max_attempts': 10})
+        cloudformation = boto3.client('cloudformation', config=boto_config)
+
+        stacks = cloudformation.describe_stacks()
+
+        cluster_ids = []
+        for stack in stacks['Stacks']:
+            for tag in stack['Tags']:
+                if tag['Key'] == 'ClusterID':
+                    cluster_ids.append(tag['Value'])
+        print "\nDeployed Clusters:"
+        print '\n'.join(list(set(cluster_ids)))
+    # elif args.environment is not None and args.number is not None:
+    #     boto_config = Config(retries={'max_attempts': 10})
+    #     ec2 = boto3.client('ec2', config=boto_config)
+    #     instances = ec2.describe_instances(
+    #         Filters=[{'Name': 'Tag:ClusterID', 'Values': ['%s%02d']}])
+    # elif args.generate_hosts is not None:
+    #     check_flags(['environment', 'number'], 'info', args)
+
+
+if __name__ == "__main__":
+    if args.type == 'config':
+        config(args)
+    elif args.type == 'install':
+        install(args)
+    elif args.type == 'scale':
+        scale(args)
+    elif args.type == 'health':
+        health(args)
+    elif args.type == 'teardown':
+        teardown(args)
+    elif args.type == 'ami':
+        ami(args)
+    elif args.type == 'info':
+        info(args)
